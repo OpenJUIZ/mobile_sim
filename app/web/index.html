@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mobile_sim</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>mobile_sim</h1>
+    <span id="connection" class="status">接続中…</span>
+  </header>
+  <main>
+    <section id="view">
+      <canvas id="map" width="640" height="640" aria-label="マップとロボット"></canvas>
+      <p class="hint">クリックでロボットを置く(ドラッグで向きも指定)。WASD / 矢印キーで操作。</p>
+    </section>
+    <aside>
+      <h2>操作</h2>
+      <canvas id="pad" width="200" height="200" aria-label="速度パッド"></canvas>
+      <p class="hint">パッドをドラッグ: 上下で前後、左右で旋回</p>
+      <label>最大速度 <input id="max_v" type="number" step="0.1" min="0.1" value="0.5"> m/s</label>
+      <label>最大角速度 <input id="max_w" type="number" step="0.1" min="0.1" value="1.0"> rad/s</label>
+      <button id="stop" type="button">停止</button>
+      <label><input id="show_rays" type="checkbox"> LiDAR の光線を描く</label>
+      <label><input id="show_trail" type="checkbox" checked> 軌跡を描く</label>
+      <button id="clear_trail" type="button">軌跡を消す</button>
+      <h2>状態</h2>
+      <dl id="state">
+        <dt>時刻</dt><dd id="s_time">-</dd>
+        <dt>位置</dt><dd id="s_pose">-</dd>
+        <dt>速度</dt><dd id="s_vel">-</dd>
+        <dt>指令</dt><dd id="s_cmd">-</dd>
+        <dt>衝突</dt><dd id="s_bumper">-</dd>
+      </dl>
+    </aside>
+  </main>
+  <script src="mobile_sim.js"></script>
+</body>
+</html>
