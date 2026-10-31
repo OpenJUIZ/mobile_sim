@@ -2,7 +2,7 @@
 
 [JUIZ](https://github.com/OpenJUIZ/juiz) を使った平面移動ロボットのシミュレータです。白黒画像のマップの上でロボットを動かし、LiDAR をシミュレートし、ブラウザで様子を見られます。`.juizapp` として配布し、`juiz run` だけで動かせるようにします。
 
-> 状態: 計画段階です。まだ動くコードはありません。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
+> 状態: 開発中です。シミュレーション本体と juiz のコンポーネントまでできています(ブラウザ画面と .juizapp の配布はまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
 
 ## できること(予定)
 
@@ -62,6 +62,33 @@ cargo test --workspace
 ```
 
 Rust 1.88 以降が要ります。juiz_sdk は `=0.0.29` に固定しています(Rust のプラグインは juiz と juiz_sdk の版が一致しないと読み込めないため)。
+
+### juiz で動かす
+
+`juiz` 0.0.29 を、プラグインと同じ rustc でビルドして入れます(`cargo install juiz_app --version 0.0.29 --locked`)。
+
+```sh
+scripts/dev_plugin.sh            # プラグインをビルドして app/plugins/<target>/ に置く
+cd app && juiz -f app.conf -d    # http://localhost:8000/ で HTTP ブローカーが立つ
+python3 scripts/integration_test.py   # 別の端末で。juiz を起動して HTTP から各プロセスを呼ぶ
+```
+
+コンテナ `mobile_sim`(インスタンス名 `sim0`)の ContainerProcess:
+
+| ContainerProcess | 引数 | 戻り値 |
+| --- | --- | --- |
+| `mobile_sim_step` | なし | なし(main_loop_ec が 50 Hz で呼ぶ) |
+| `mobile_sim_set_velocity` | `velocity: Twist2D`, `index` | なし。トピック `cmd_vel` を購読 |
+| `mobile_sim_get_pose` | `index` | `Pose2DStamped` |
+| `mobile_sim_get_odometry` | `index` | `{time, pose, twist, distance}` |
+| `mobile_sim_get_scan` | `index` | `LaserScan`(何にも当たらないビームは `range_max + 1`) |
+| `mobile_sim_get_map` | なし | 画像(PNG) |
+| `mobile_sim_get_map_info` | なし | mapconf の内容と画像の大きさ |
+| `mobile_sim_load_map` | `map`(mapconf のパス) | なし |
+| `mobile_sim_reset_pose` | `pose: Pose2D`, `index` | なし |
+| `mobile_sim_get_state` | なし | 全ロボットの姿勢・速度・スキャン(画面用) |
+
+ロボットの形・速度の上限・LiDAR などは `app/app.conf` のコンテナの引数で変えられます(書き方は `crates/mobile_sim/src/config.rs`)。マップのパスは環境変数 `MOBILE_SIM_MAP` でも上書きできます。
 
 ## ライセンス
 

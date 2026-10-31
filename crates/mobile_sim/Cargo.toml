@@ -14,3 +14,7 @@ crate-type = ["cdylib", "rlib"]
 juiz_sdk.workspace = true
 juiz_std_types.workspace = true
 mobile_sim_core.workspace = true
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"

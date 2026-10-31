@@ -768,6 +768,8 @@ dependencies = [
  "juiz_sdk",
  "juiz_std_types",
  "mobile_sim_core",
+ "serde",
+ "tempfile",
 ]
 
 [[package]]

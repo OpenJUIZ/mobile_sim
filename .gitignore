@@ -2,3 +2,4 @@
 *.juizapp
 /app/plugins/
 .DS_Store
+/app/.integration_test.conf
