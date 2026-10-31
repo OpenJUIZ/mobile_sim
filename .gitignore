@@ -1,0 +1,4 @@
+/target
+*.juizapp
+/app/plugins/
+.DS_Store

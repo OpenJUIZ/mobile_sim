@@ -54,6 +54,15 @@ negate: 0
 | `docker/` | Dockerfile と compose.yml |
 | `examples/` | 速度を送るサンプル |
 
+## 開発
+
+```sh
+cargo build --workspace   # target/debug/libmobile_sim.so などができる
+cargo test --workspace
+```
+
+Rust 1.88 以降が要ります。juiz_sdk は `=0.0.29` に固定しています(Rust のプラグインは juiz と juiz_sdk の版が一致しないと読み込めないため)。
+
 ## ライセンス
 
-MIT または Apache-2.0 のどちらか(デュアルライセンス)にする予定です。
+MIT または Apache-2.0 のどちらか(デュアルライセンス)です。[LICENSE-MIT](LICENSE-MIT)・[LICENSE-APACHE](LICENSE-APACHE) を見てください。

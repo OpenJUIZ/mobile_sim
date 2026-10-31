@@ -1,0 +1,10 @@
+[package]
+name = "mobile_sim_core"
+description = "Simulation core of mobile_sim (vehicle, map, collision, LiDAR). Independent of juiz."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
