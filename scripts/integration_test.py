@@ -1,7 +1,9 @@
 """juiz で app/app.conf を起動し、HTTP からプロセスを呼んで動作を確かめる(M2 の結合テスト)
 
 使い方: scripts/dev_plugin.sh && python3 scripts/integration_test.py [--juiz <juiz のパス>] [--port 18000]
+       python3 scripts/integration_test.py --juizapp dist/mobile_sim-0.1.0.juizapp   # juiz run で起動する(ポートは 8000)
 """
+import os
 import argparse
 import json
 import subprocess
@@ -19,21 +21,31 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--juiz", default="juiz")
     ap.add_argument("--port", type=int, default=18000)
+    ap.add_argument("--juizapp", help="test this package with `juiz run` instead of app/app.conf")
     args = ap.parse_args()
-    base = f"http://localhost:{args.port}"
-
-    # ポートだけ変えた conf を app/ に置く(プラグインと地図の相対パスを保つため)
-    conf = (ROOT / "app" / "app.conf").read_text()
-    conf = conf.replace('"port": 8000', f'"port": {args.port}')
-    tmp = ROOT / "app" / ".integration_test.conf"
-    tmp.write_text(conf)
     log = tempfile.TemporaryFile()
-    proc = subprocess.Popen(
-        [args.juiz, "-f", tmp.name, "-d"],
-        cwd=ROOT / "app",
-        stdout=log,
-        stderr=subprocess.STDOUT,
-    )
+    tmp = None
+
+    if args.juizapp:
+        # 基礎パッケージのポートは juizapp.yaml の base.http_port(8000)で決まる。
+        # カレントディレクトリと展開先のキャッシュは空の一時ディレクトリにする(app/ の中身に頼らないことを確かめる)
+        base = "http://localhost:8000"
+        work = tempfile.mkdtemp()
+        env = dict(os.environ, JUIZ_CACHE_DIR=os.path.join(work, "cache"))
+        cmd = [args.juiz, "run", str(Path(args.juizapp).resolve())]
+        cwd = work
+    else:
+        # ポートだけ変えた conf を app/ に置く(プラグインと地図の相対パスを保つため)
+        base = f"http://localhost:{args.port}"
+        conf = (ROOT / "app" / "app.conf").read_text()
+        conf = conf.replace('"port": 8000', f'"port": {args.port}')
+        tmp = ROOT / "app" / ".integration_test.conf"
+        tmp.write_text(conf)
+        env = None
+        cmd = [args.juiz, "-f", tmp.name, "-d"]
+        cwd = ROOT / "app"
+
+    proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=log, stderr=subprocess.STDOUT)
     try:
         wait_ready(base, proc, log)
         run_checks(base)
@@ -44,7 +56,8 @@ def main():
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
-        tmp.unlink(missing_ok=True)
+        if tmp:
+            tmp.unlink(missing_ok=True)
 
 
 def wait_ready(base, proc, log):
