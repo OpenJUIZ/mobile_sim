@@ -2,7 +2,7 @@
 
 [JUIZ](https://github.com/OpenJUIZ/juiz) を使った平面移動ロボットのシミュレータです。白黒画像のマップの上でロボットを動かし、LiDAR をシミュレートし、ブラウザで様子を見られます。`.juizapp` として配布し、`juiz run` だけで動かせるようにします。
 
-> 状態: 開発中です。シミュレーション本体、juiz のコンポーネント、ブラウザ画面、.juizapp のビルドまでできています(Docker はまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
+> 状態: 開発中です。シミュレーション本体、juiz のコンポーネント、ブラウザ画面、.juizapp のビルド、Docker イメージまでできています(最初のリリースはまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
 
 ## できること(予定)
 
@@ -33,11 +33,22 @@ juiz run mobile_sim-0.1.0.juizapp
 - 基礎パッケージ(`kind: base`)なので、別の juiz アプリから `depends: { mobile_sim: "^0.1" }` でつなげます(IPC の名前は `mobile_sim`)。
 - juiz 0.0.29 では、`juiz run` で起動するとブラウザ画面が配信されません(静的ファイルのパスをカレントディレクトリから探すため。OpenJUIZ/juiz#318 で直り、次の版から効きます)。HTTP の API は動きます。
 
-Docker なら次のとおりです。
+### Docker
 
 ```sh
-docker run -p 8000:8000 ghcr.io/openjuiz/mobile_sim
+docker run --rm -p 8000:8000 ghcr.io/openjuiz/mobile_sim
+# ブラウザで http://localhost:8000/ を開く
 ```
+
+- イメージは linux/amd64 と linux/arm64 です。`:latest` はリリースの版、`:edge` は main の最新です。
+- 別の地図を使うときは、mapconf と画像を置いたディレクトリを `/maps` に入れ、`MOBILE_SIM_MAP` で mapconf を指します。
+
+  ```sh
+  docker run --rm -p 8000:8000 -v ./maps:/maps:ro -e MOBILE_SIM_MAP=/maps/my_map.yaml ghcr.io/openjuiz/mobile_sim
+  ```
+
+- `docker compose -f docker/compose.yml up` でも動きます(手元でビルドするときは `--build` を付ける)。
+- イメージの中では juiz とプラグインを同じ rustc でビルドしているので、juiz を別に入れる必要はありません。
 
 mapconf の例:
 

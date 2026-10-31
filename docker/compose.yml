@@ -1,0 +1,16 @@
+# docker compose -f docker/compose.yml up
+# ブラウザで http://localhost:8000/ を開く
+services:
+  mobile_sim:
+    image: ghcr.io/openjuiz/mobile_sim:latest
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    # 別の地図を使うときは、maps/ に mapconf と画像を置いて次の 2 つを有効にする
+    # volumes:
+    #   - ./maps:/maps:ro
+    # environment:
+    #   MOBILE_SIM_MAP: /maps/my_map.yaml
+    restart: unless-stopped
