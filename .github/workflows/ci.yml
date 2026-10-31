@@ -27,3 +27,27 @@ jobs:
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo build --workspace
       - run: cargo test --workspace
+
+  integration:
+    # juiz で app/app.conf を起動し、HTTP からプロセスを呼ぶ。
+    # Rust のプラグインは juiz と同じ rustc でビルドしないと読み込めないので、juiz もこのジョブでビルドする
+    runs-on: ubuntu-latest
+    env:
+      JUIZ_VERSION: "0.0.29"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        id: toolchain
+      - uses: Swatinem/rust-cache@v2
+      - name: Cache juiz
+        id: cache-juiz
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/juiz
+          key: juiz-${{ env.JUIZ_VERSION }}-${{ runner.os }}-${{ steps.toolchain.outputs.cachekey }}
+      - name: Install juiz
+        if: steps.cache-juiz.outputs.cache-hit != 'true'
+        # 埋め込みの Python は使わないので外す
+        run: cargo install juiz_app --version "$JUIZ_VERSION" --locked --no-default-features
+      - run: scripts/dev_plugin.sh
+      - run: python3 scripts/integration_test.py
