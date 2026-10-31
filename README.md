@@ -2,7 +2,7 @@
 
 [JUIZ](https://github.com/OpenJUIZ/juiz) を使った平面移動ロボットのシミュレータです。白黒画像のマップの上でロボットを動かし、LiDAR をシミュレートし、ブラウザで様子を見られます。`.juizapp` として配布し、`juiz run` だけで動かせるようにします。
 
-> 状態: 開発中です。シミュレーション本体、juiz のコンポーネント、ブラウザ画面までできています(.juizapp の配布と Docker はまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
+> 状態: 開発中です。シミュレーション本体、juiz のコンポーネント、ブラウザ画面、.juizapp のビルドまでできています(Docker はまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
 
 ## できること(予定)
 
@@ -16,16 +16,22 @@
 
 [OpenJUIZ/juiz](https://github.com/OpenJUIZ/juiz) の `examples/python/turtle_sim_py` を Rust に移植したものです。
 
-## 使い方(予定)
+## 使い方
+
+[Releases](https://github.com/OpenJUIZ/mobile_sim/releases) から `.juizapp` を取ってきて、同じ版の juiz で動かします。
 
 ```sh
-# juiz を入れる(配布する .juizapp と同じ版)
-pip install juiz-cli
+# juiz を入れる。版はパッケージの juizapp.yaml の juiz(Releases の説明にも書きます)と同じにする
+pip install juiz-cli==0.0.29
 
-# Releases から取ってきたパッケージを動かす
 juiz run mobile_sim-0.1.0.juizapp
 # ブラウザで http://localhost:8000/ を開く
 ```
+
+- Linux(x86_64・arm64)、macOS(Intel・Apple Silicon)、Windows(x86_64)のプラグインが入っています。
+- Rust のプラグインは、juiz と juiz_sdk の版も、juiz をビルドした rustc の版も一致しないと読み込めません。パッケージは pip の `juiz-cli` と同じ rustc でビルドしているので、`cargo install` で入れた juiz では動かないことがあります。
+- 基礎パッケージ(`kind: base`)なので、別の juiz アプリから `depends: { mobile_sim: "^0.1" }` でつなげます(IPC の名前は `mobile_sim`)。
+- juiz 0.0.29 では、`juiz run` で起動するとブラウザ画面が配信されません(静的ファイルのパスをカレントディレクトリから探すため。OpenJUIZ/juiz#318 で直り、次の版から効きます)。HTTP の API は動きます。
 
 Docker なら次のとおりです。
 
@@ -72,6 +78,21 @@ scripts/dev_plugin.sh            # プラグインをビルドして app/plugins
 cd app && juiz -f app.conf -d    # http://localhost:8000/ で HTTP ブローカーが立つ
 python3 scripts/integration_test.py   # 別の端末で。juiz を起動して HTTP から各プロセスを呼ぶ
 ```
+
+### パッケージを作る
+
+CI の Release ワークフローが、ターゲットごとにプラグインをビルドして `.juizapp` にまとめ、`juiz run` で結合テストをします。タグ `v<版>`(`app/juizapp.yaml` の `version` と同じ)を push すると Releases に載ります。手元では次のとおりです。
+
+```sh
+python3 scripts/juiz_rustc.py 0.0.29          # pip の juiz-cli をビルドした rustc の版(1.99.1)
+rustup toolchain install 1.99.1
+cargo +1.99.1 build -p mobile_sim --release
+mkdir -p /tmp/plugins/x86_64-unknown-linux-gnu && cp target/release/libmobile_sim.so /tmp/plugins/x86_64-unknown-linux-gnu/
+scripts/pack.sh /tmp/plugins dist            # dist/mobile_sim-0.1.0.juizapp
+python3 scripts/integration_test.py --juizapp dist/mobile_sim-0.1.0.juizapp
+```
+
+juiz の新しい版に合わせるときは、`Cargo.toml` の `juiz_sdk`・`juiz_std_types` と `app/juizapp.yaml` の `juiz` を上げます。rustc の版は CI が juiz-cli の wheel から読みます。
 
 ### ブラウザ画面
 

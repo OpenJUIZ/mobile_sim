@@ -1,0 +1,109 @@
+name: Release
+
+# ターゲットごとにプラグインをビルドし、.juizapp にまとめる。タグ v* では Releases に載せる。
+# Rust のプラグインは juiz と同じ juiz_sdk・同じ rustc でないと読み込めない(juiz docs/spec/app-package.md §12.1)。
+# juiz の版は Cargo.toml の juiz_sdk から、rustc の版は PyPI の juiz-cli の wheel から決めるので、
+# juiz の新しい版に合わせるときは Cargo.toml と app/juizapp.yaml の版を上げるだけでよい。
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  versions:
+    runs-on: ubuntu-latest
+    outputs:
+      juiz: ${{ steps.v.outputs.juiz }}
+      rustc: ${{ steps.v.outputs.rustc }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          juiz=$(sed -n 's/^juiz_sdk = "=\(.*\)"/\1/p' Cargo.toml)
+          rustc=$(python3 scripts/juiz_rustc.py "$juiz")
+          echo "juiz $juiz, rustc $rustc"
+          echo "juiz=$juiz" >> "$GITHUB_OUTPUT"
+          echo "rustc=$rustc" >> "$GITHUB_OUTPUT"
+          grep -qx "juiz: \"=$juiz\"" app/juizapp.yaml || { echo "app/juizapp.yaml の juiz を \"=$juiz\" にしてください"; exit 1; }
+      - name: Check the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(sed -n 's/^version: //p' app/juizapp.yaml)
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != app/juizapp.yaml version $version"; exit 1; }
+
+  plugin:
+    needs: versions
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux は古めの glibc でビルドする(新しい glibc にしか無い記号を使わないように)
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04, lib: libmobile_sim.so }
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-22.04-arm, lib: libmobile_sim.so }
+          - { target: x86_64-apple-darwin, os: macos-15, lib: libmobile_sim.dylib }
+          - { target: aarch64-apple-darwin, os: macos-15, lib: libmobile_sim.dylib }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, lib: mobile_sim.dll }
+    runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ needs.versions.outputs.rustc }}
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build -p mobile_sim --release --target ${{ matrix.target }}
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p "plugins/${{ matrix.target }}"
+          cp "target/${{ matrix.target }}/release/${{ matrix.lib }}" "plugins/${{ matrix.target }}/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugin-${{ matrix.target }}
+          path: plugins
+
+  pack:
+    needs: [versions, plugin]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: plugin-*
+          path: plugins
+          merge-multiple: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 配布先と同じく pip の juiz-cli を使う(rustc が合っていることもここで確かめられる)
+      - run: pip install "juiz-cli==${{ needs.versions.outputs.juiz }}"
+      - run: scripts/pack.sh plugins dist
+      - name: Test the package with juiz run
+        run: python3 scripts/integration_test.py --juizapp dist/*.juizapp
+      - uses: actions/upload-artifact@v4
+        with:
+          name: juizapp
+          path: dist/*.juizapp
+      - name: Publish to Releases
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.juizapp --title "$GITHUB_REF_NAME" --generate-notes \
+            --notes "juiz ${{ needs.versions.outputs.juiz }} で動きます: \`pip install juiz-cli==${{ needs.versions.outputs.juiz }}\` の後、\`juiz run $(basename dist/*.juizapp)\`"

@@ -5,3 +5,4 @@
 /app/.integration_test.conf
 /node_modules
 /ui_test.png
+/dist/

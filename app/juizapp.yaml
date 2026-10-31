@@ -1,0 +1,13 @@
+# .juizapp のマニフェスト(juiz docs/spec/app-package.md §4)。languages・targets・rust・files は juiz pack が書き足す
+format: 1
+name: mobile_sim
+version: 0.1.0
+kind: base
+description: "Planar mobile robot simulator with map, collision, LiDAR and a browser view"
+license: MIT OR Apache-2.0
+homepage: https://github.com/OpenJUIZ/mobile_sim
+# Rust のプラグインは juiz_sdk と同じ版の juiz でしか読めない(Cargo.toml の juiz_sdk と揃える)
+juiz: "=0.0.29"
+entry: app.conf
+base:
+  http_port: 8000
