@@ -51,3 +51,17 @@ jobs:
         run: cargo install juiz_app --version "$JUIZ_VERSION" --locked --no-default-features
       - run: scripts/dev_plugin.sh
       - run: python3 scripts/integration_test.py
+      - name: UI test (Playwright)
+        run: |
+          npm install --no-save playwright@1
+          npx playwright install --with-deps chromium
+          cd app && (juiz -f app.conf -d > /tmp/juiz.log 2>&1 &) && cd ..
+          for i in $(seq 100); do curl -sf localhost:8000/api/container/list > /dev/null && break; sleep 0.2; done
+          node scripts/ui_test.js http://localhost:8000/ ui_test.png
+      - name: Upload UI screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui_test
+          path: ui_test.png
+          if-no-files-found: ignore

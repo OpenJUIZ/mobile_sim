@@ -2,7 +2,7 @@
 
 [JUIZ](https://github.com/OpenJUIZ/juiz) を使った平面移動ロボットのシミュレータです。白黒画像のマップの上でロボットを動かし、LiDAR をシミュレートし、ブラウザで様子を見られます。`.juizapp` として配布し、`juiz run` だけで動かせるようにします。
 
-> 状態: 開発中です。シミュレーション本体と juiz のコンポーネントまでできています(ブラウザ画面と .juizapp の配布はまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
+> 状態: 開発中です。シミュレーション本体、juiz のコンポーネント、ブラウザ画面までできています(.juizapp の配布と Docker はまだ)。計画は [docs/plan.md](docs/plan.md)、進み具合は [Issues](https://github.com/OpenJUIZ/mobile_sim/issues) を見てください。
 
 ## できること(予定)
 
@@ -72,6 +72,16 @@ scripts/dev_plugin.sh            # プラグインをビルドして app/plugins
 cd app && juiz -f app.conf -d    # http://localhost:8000/ で HTTP ブローカーが立つ
 python3 scripts/integration_test.py   # 別の端末で。juiz を起動して HTTP から各プロセスを呼ぶ
 ```
+
+### ブラウザ画面
+
+juiz を起動して http://localhost:8000/ を開きます。画面は `app/web/` にあり、HTTP ブローカーの `static_filepaths` で配信します。
+
+- WASD か矢印キー、または右のパッドをドラッグして動かす(離すと止まる)
+- マップをクリックするとそこへロボットを置き、ドラッグで向きを決める
+- スキャンの線と軌跡は切り替えられる
+
+juiz 0.0.29 は `static_filepaths` を起動した場所から探すので、`app/` で起動してください(conf の場所基準にする修正は OpenJUIZ/juiz#318)。画面のテストは `node scripts/ui_test.js`(Playwright が要ります。juiz を `app/` で起動してから)。
 
 コンテナ `mobile_sim`(インスタンス名 `sim0`)の ContainerProcess:
 
