@@ -49,6 +49,7 @@ def main():
     try:
         wait_ready(base, proc, log)
         run_checks(base)
+        check_web(base)
         print("OK")
     finally:
         proc.terminate()
@@ -98,6 +99,13 @@ def check(cond, msg):
     if not cond:
         sys.exit("FAILED: " + msg)
     print("ok -", msg)
+
+
+def check_web(base):
+    """ブラウザ画面が static_filepaths で配信されている"""
+    for path in ["/", "/mobile_sim.js"]:
+        with urllib.request.urlopen(base + path, timeout=5) as r:
+            check(r.status == 200, f"web UI {path} is served")
 
 
 def run_checks(base):

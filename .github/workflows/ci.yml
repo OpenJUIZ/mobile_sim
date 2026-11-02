@@ -33,7 +33,7 @@ jobs:
     # Rust のプラグインは juiz と同じ rustc でビルドしないと読み込めないので、juiz もこのジョブでビルドする
     runs-on: ubuntu-latest
     env:
-      JUIZ_VERSION: "0.0.29"
+      JUIZ_VERSION: "0.1.0"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable

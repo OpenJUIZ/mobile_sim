@@ -4,7 +4,7 @@
 #
 # Rust のプラグインは juiz と同じ juiz_sdk・同じ rustc でないと読み込めないので、
 # juiz とプラグインを同じ builder でビルドする(juiz の版は Cargo.toml の juiz_sdk と揃える)。
-ARG JUIZ_VERSION=0.0.29
+ARG JUIZ_VERSION=0.1.0
 
 FROM rust:1-bookworm AS build
 ARG JUIZ_VERSION

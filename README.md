@@ -22,7 +22,7 @@
 
 ```sh
 # juiz を入れる。版はパッケージの juizapp.yaml の juiz(Releases の説明にも書きます)と同じにする
-pip install juiz-cli==0.0.29
+pip install juiz-cli==0.1.0
 
 juiz run mobile_sim-0.1.0.juizapp
 # ブラウザで http://localhost:8000/ を開く
@@ -31,7 +31,6 @@ juiz run mobile_sim-0.1.0.juizapp
 - Linux(x86_64・arm64)、macOS(Intel・Apple Silicon)、Windows(x86_64)のプラグインが入っています。
 - Rust のプラグインは、juiz と juiz_sdk の版も、juiz をビルドした rustc の版も一致しないと読み込めません。パッケージは pip の `juiz-cli` と同じ rustc でビルドしているので、`cargo install` で入れた juiz では動かないことがあります。
 - 基礎パッケージ(`kind: base`)なので、別の juiz アプリから `depends: { mobile_sim: "^0.1" }` でつなげます(IPC の名前は `mobile_sim`)。
-- juiz 0.0.29 では、`juiz run` で起動するとブラウザ画面が配信されません(静的ファイルのパスをカレントディレクトリから探すため。OpenJUIZ/juiz#318 で直り、次の版から効きます)。HTTP の API は動きます。
 
 ### Docker
 
@@ -78,11 +77,11 @@ cargo build --workspace   # target/debug/libmobile_sim.so などができる
 cargo test --workspace
 ```
 
-Rust 1.88 以降が要ります。juiz_sdk は `=0.0.29` に固定しています(Rust のプラグインは juiz と juiz_sdk の版が一致しないと読み込めないため)。
+Rust 1.88 以降が要ります。juiz_sdk は `=0.1.0` に固定しています(Rust のプラグインは juiz と juiz_sdk の版が一致しないと読み込めないため)。
 
 ### juiz で動かす
 
-`juiz` 0.0.29 を、プラグインと同じ rustc でビルドして入れます(`cargo install juiz_app --version 0.0.29 --locked`)。
+`juiz` 0.1.0 を、プラグインと同じ rustc でビルドして入れます(`cargo install juiz_app --version 0.1.0 --locked`)。
 
 ```sh
 scripts/dev_plugin.sh            # プラグインをビルドして app/plugins/<target>/ に置く
@@ -95,7 +94,7 @@ python3 scripts/integration_test.py   # 別の端末で。juiz を起動して H
 CI の Release ワークフローが、ターゲットごとにプラグインをビルドして `.juizapp` にまとめ、`juiz run` で結合テストをします。タグ `v<版>`(`app/juizapp.yaml` の `version` と同じ)を push すると Releases に載ります。手元では次のとおりです。
 
 ```sh
-python3 scripts/juiz_rustc.py 0.0.29          # pip の juiz-cli をビルドした rustc の版(1.99.1)
+python3 scripts/juiz_rustc.py 0.1.0           # pip の juiz-cli をビルドした rustc の版(1.99.1)
 rustup toolchain install 1.99.1
 cargo +1.99.1 build -p mobile_sim --release
 mkdir -p /tmp/plugins/x86_64-unknown-linux-gnu && cp target/release/libmobile_sim.so /tmp/plugins/x86_64-unknown-linux-gnu/
@@ -113,7 +112,7 @@ juiz を起動して http://localhost:8000/ を開きます。画面は `app/web
 - マップをクリックするとそこへロボットを置き、ドラッグで向きを決める
 - スキャンの線と軌跡は切り替えられる
 
-juiz 0.0.29 は `static_filepaths` を起動した場所から探すので、`app/` で起動してください(conf の場所基準にする修正は OpenJUIZ/juiz#318)。画面のテストは `node scripts/ui_test.js`(Playwright が要ります。juiz を `app/` で起動してから)。
+画面のテストは `node scripts/ui_test.js`(Playwright が要ります。juiz を起動してから)。
 
 コンテナ `mobile_sim`(インスタンス名 `sim0`)の ContainerProcess:
 
