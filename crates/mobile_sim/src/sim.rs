@@ -88,13 +88,26 @@ impl MobileSim {
         })
     }
 
+    /// オドメトリの姿勢(odom 座標系。誤差の設定が無ければ真の姿勢と同じ)
+    pub fn odom_pose(&self, index: i64) -> Result<Pose2DStamped, String> {
+        let p = self
+            .world
+            .odom_pose(to_index(index)?)
+            .map_err(|e| e.to_string())?;
+        Ok(Pose2DStamped {
+            header: header(self.world.time(), "odom"),
+            pose: to_pose(&p),
+        })
+    }
+
     pub fn odometry(&self, index: i64) -> Result<Value, String> {
         let i = to_index(index)?;
         let s = self.world.state(i).map_err(|e| e.to_string())?;
         let r = self.world.robot(i).map_err(|e| e.to_string())?;
         Ok(json!({
             "time": self.world.time(),
-            "pose": pose_json(&s.pose),
+            "frame_id": "odom",
+            "pose": pose_json(&r.odom_pose),
             "twist": twist_json(&s.velocity),
             "distance": r.distance,
         }))
@@ -319,6 +332,12 @@ mod tests {
 
         let odo = s.odometry(0).unwrap();
         assert!((odo["distance"].as_f64().unwrap() - 0.2).abs() < 1e-9);
+        // 誤差の設定が無ければオドメトリは真の姿勢と同じ
+        assert!((odo["pose"]["x"].as_f64().unwrap() - 0.2).abs() < 1e-9);
+        let o = s.odom_pose(0).unwrap();
+        assert_eq!(o.header.frame_id, "odom");
+        assert_eq!(o.pose, p.pose);
+        assert!(s.odom_pose(3).is_err());
         assert!(s.set_velocity(1, &twist(0.0, 0.0, 0.0)).is_err());
         assert!(s.set_velocity(-1, &twist(0.0, 0.0, 0.0)).is_err());
     }
@@ -404,6 +423,28 @@ mod tests {
         assert!(MobileSim::new("missing.yaml", None, None, 0).is_err());
         assert!(MobileSim::new(y, Some(&json!([{"radius": -1.0}])), None, 0).is_err());
         assert!(MobileSim::new(y, None, Some(&json!({"mode": "fixed", "dt": -1})), 0).is_err());
+    }
+
+    #[test]
+    fn noisy_odometry_drifts_from_truth() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = MobileSim::new(
+            room(dir.path()).to_str().unwrap(),
+            Some(&json!([{
+                "max_acceleration": {"vx": 10.0, "vy": 10.0, "omega": 10.0},
+                "odometry": {"linear_scale": 1.1}
+            }])),
+            Some(&json!({"mode": "fixed", "dt": 0.1})),
+            0,
+        )
+        .unwrap();
+        s.set_velocity(0, &twist(0.5, 0.0, 0.0)).unwrap();
+        for _ in 0..4 {
+            s.step();
+        }
+        assert!((s.pose(0).unwrap().pose.position.x - 0.2).abs() < 1e-9);
+        assert!((s.odom_pose(0).unwrap().pose.position.x - 0.22).abs() < 1e-9);
+        assert!((s.odometry(0).unwrap()["pose"]["x"].as_f64().unwrap() - 0.22).abs() < 1e-9);
     }
 
     #[test]

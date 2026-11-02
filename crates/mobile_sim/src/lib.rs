@@ -8,7 +8,8 @@
 //! | `mobile_sim_step` | なし | なし |
 //! | `mobile_sim_set_velocity` | `velocity: Twist2D`, `index` | なし |
 //! | `mobile_sim_get_pose` | `index` | `Pose2DStamped` |
-//! | `mobile_sim_get_odometry` | `index` | `{time, pose, twist, distance}` |
+//! | `mobile_sim_get_odometry` | `index` | `{time, frame_id, pose, twist, distance}`(pose はオドメトリの姿勢) |
+//! | `mobile_sim_get_odom_pose` | `index` | `Pose2DStamped`(odom 座標系。誤差を含む) |
 //! | `mobile_sim_get_scan` | `index` | `LaserScan` |
 //! | `mobile_sim_get_map` | なし | 画像 |
 //! | `mobile_sim_get_map_info` | なし | mapconf の内容と画像の大きさ |
@@ -40,8 +41,8 @@ fn err(e: String) -> JuizError {
         }
         description = {
             map = "Path of the mapconf (ROS map_server YAML). Relative to JUIZ_APP_DIR if set"
-            seed = "Random seed of LiDAR noise"
-            robots = "List of robot settings (drive, radius, max_velocity, max_acceleration, command_timeout, initial_pose, lidar)"
+            seed = "Random seed of LiDAR and odometry noise"
+            robots = "List of robot settings (drive, radius, max_velocity, max_acceleration, command_timeout, initial_pose, lidar, odometry)"
             step = "{mode: fixed, dt} or {mode: real_time, max_dt}"
         }
     }
@@ -108,6 +109,18 @@ fn mobile_sim_get_odometry(
     index: i64,
 ) -> JuizResult<Value> {
     container.odometry(index).map_err(|e| anyhow!(err(e)))
+}
+
+#[juiz_component_container_process(
+    container_type = "mobile_sim"
+    description = "Odometry pose of a robot in the odom frame (with odometry errors)"
+    arguments = { default = { index = 0 } }
+)]
+fn mobile_sim_get_odom_pose(
+    container: &mut ContainerImpl<MobileSim>,
+    index: i64,
+) -> JuizResult<Pose2DStamped> {
+    container.odom_pose(index).map_err(|e| anyhow!(err(e)))
 }
 
 #[juiz_component_container_process(
@@ -183,6 +196,7 @@ juiz_component_manifest!(
             mobile_sim_set_velocity,
             mobile_sim_get_pose,
             mobile_sim_get_odometry,
+            mobile_sim_get_odom_pose,
             mobile_sim_get_scan,
             mobile_sim_get_map,
             mobile_sim_get_map_info,

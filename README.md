@@ -118,16 +118,32 @@ juiz を起動して http://localhost:8000/ を開きます。画面は `app/web
 
 | ContainerProcess | 引数 | 戻り値 |
 | --- | --- | --- |
-| `mobile_sim_step` | なし | なし(main_loop_ec が 50 Hz で呼ぶ) |
+| `mobile_sim_step` | なし | なし(main_loop_ec が 20 Hz で呼ぶ) |
 | `mobile_sim_set_velocity` | `velocity: Twist2D`, `index` | なし。トピック `cmd_vel` を購読 |
-| `mobile_sim_get_pose` | `index` | `Pose2DStamped` |
-| `mobile_sim_get_odometry` | `index` | `{time, pose, twist, distance}` |
-| `mobile_sim_get_scan` | `index` | `LaserScan`(何にも当たらないビームは `range_max + 1`) |
+| `mobile_sim_get_pose` | `index` | `Pose2DStamped`(真の姿勢、frame `map`) |
+| `mobile_sim_get_odometry` | `index` | `{time, frame_id, pose, twist, distance}`(`pose` はオドメトリの姿勢) |
+| `mobile_sim_get_odom_pose` | `index` | `Pose2DStamped`(オドメトリの姿勢、frame `odom`)。step のたびにトピック `odom` に出す |
+| `mobile_sim_get_scan` | `index` | `LaserScan`(何にも当たらないビームは `range_max + 1`)。step のたびにトピック `scan` に出す |
 | `mobile_sim_get_map` | なし | 画像(PNG) |
 | `mobile_sim_get_map_info` | なし | mapconf の内容と画像の大きさ |
 | `mobile_sim_load_map` | `map`(mapconf のパス) | なし |
 | `mobile_sim_reset_pose` | `pose: Pose2D`, `index` | なし |
 | `mobile_sim_get_state` | なし | 全ロボットの姿勢・速度・スキャン(画面用) |
+
+main_loop_ec は 1 周で `step0` → `get_odom_pose0` → `get_scan0` の順に呼ぶので、トピック `odom` と `scan` は同じ時刻の値が 20 Hz で出ます([mapper_gmapping](https://github.com/OpenJUIZ/mapper_gmapping) はこれを購読して地図を作ります)。
+
+オドメトリは真の動きに誤差を足して積算します。初期姿勢から始まり、`reset_pose` では変わりません(瞬間移動は車輪で測れないため)。誤差はロボットの `odometry` で決めます。
+
+```yaml
+"odometry":
+  "linear_scale": 1.0     # 並進の倍率(系統誤差)
+  "angular_scale": 1.0    # 回転の倍率(系統誤差)
+  "linear_noise": 0.02    # 1 m 走ったときの並進の誤差の標準偏差 [m]
+  "angular_noise": 0.03   # 1 rad 回ったときの向きの誤差の標準偏差 [rad]
+  "drift_noise": 0.02     # 1 m 走ったときの向きの誤差の標準偏差 [rad]
+```
+
+書かなければ誤差無しで、オドメトリは真の姿勢と同じになります。誤差の分散は動いた量に比例させているので、step の刻みを変えても誤差の大きさは変わりません。
 
 ロボットの形・速度の上限・LiDAR などは `app/app.conf` のコンテナの引数で変えられます(書き方は `crates/mobile_sim/src/config.rs`)。マップのパスは環境変数 `MOBILE_SIM_MAP` でも上書きできます。
 
