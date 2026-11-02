@@ -91,7 +91,7 @@ python3 scripts/integration_test.py   # 別の端末で。juiz を起動して H
 
 ### パッケージを作る
 
-CI の Release ワークフローが、ターゲットごとにプラグインをビルドして `.juizapp` にまとめ、`juiz run` で結合テストをします。タグ `v<版>`(`app/juizapp.yaml` の `version` と同じ)を push すると Releases に載ります。手元では次のとおりです。
+CI の Release ワークフローが、ターゲットごとにプラグインをビルドして `.juizapp` にまとめ、`juiz run` で結合テストをします。タグ `v<版>`(`app/juizapp.yaml` の `version` と同じ)を push するか、GitHub の画面でそのタグの Release を作ると、Releases に `.juizapp` が載ります。手元では次のとおりです。
 
 ```sh
 python3 scripts/juiz_rustc.py 0.1.0           # pip の juiz-cli をビルドした rustc の版(1.99.1)
