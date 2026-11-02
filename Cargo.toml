@@ -11,6 +11,6 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 # Rust のプラグインは、読み込む juiz と juiz_sdk の版が完全に一致しないと動かない(juiz の docs/spec/app-package.md §4.3)
-juiz_sdk = "=0.0.29"
-juiz_std_types = "=0.0.29"
+juiz_sdk = "=0.1.0"
+juiz_std_types = "=0.1.0"
 mobile_sim_core = { path = "crates/mobile_sim_core" }

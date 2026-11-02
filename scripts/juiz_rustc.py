@@ -4,7 +4,7 @@ Rust のプラグインは juiz と同じ rustc でビルドしないと読み�
 配布用のプラグインは pip の juiz-cli で動かすので、その wheel の中のビルド情報
 (juiz_sdk=…;rustc=rustc 1.99.1 (…))から rustc の版を読む。
 
-使い方: python3 scripts/juiz_rustc.py 0.0.29   # => 1.99.1
+使い方: python3 scripts/juiz_rustc.py 0.1.0   # => 1.99.1
 """
 import io
 import json
