@@ -104,6 +104,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
+        # GitHub の画面で Release を作ってタグを打ったときは、その Release に .juizapp を足す
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.juizapp --title "$GITHUB_REF_NAME" --generate-notes \
-            --notes "juiz ${{ needs.versions.outputs.juiz }} で動きます: \`pip install juiz-cli==${{ needs.versions.outputs.juiz }}\` の後、\`juiz run $(basename dist/*.juizapp)\`"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/*.juizapp --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.juizapp --title "$GITHUB_REF_NAME" --generate-notes \
+              --notes "juiz ${{ needs.versions.outputs.juiz }} で動きます: \`pip install juiz-cli==${{ needs.versions.outputs.juiz }}\` の後、\`juiz run $(basename dist/*.juizapp)\`"
+          fi
