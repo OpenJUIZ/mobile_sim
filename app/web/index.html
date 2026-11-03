@@ -25,14 +25,17 @@
       <button id="stop" type="button">停止</button>
       <label><input id="show_rays" type="checkbox"> LiDAR の光線を描く</label>
       <label><input id="show_trail" type="checkbox" checked> 軌跡を描く</label>
+      <label><input id="show_frames" type="checkbox" checked> 座標系とオドメトリを描く</label>
       <button id="clear_trail" type="button">軌跡を消す</button>
       <h2>状態</h2>
       <dl id="state">
         <dt>時刻</dt><dd id="s_time">-</dd>
         <dt>位置</dt><dd id="s_pose">-</dd>
+        <dt>オドメトリ</dt><dd id="s_odom">-</dd>
         <dt>速度</dt><dd id="s_vel">-</dd>
         <dt>指令</dt><dd id="s_cmd">-</dd>
         <dt>衝突</dt><dd id="s_bumper">-</dd>
+        <dt>座標系</dt><dd id="s_frames">-</dd>
       </dl>
     </aside>
   </main>

@@ -64,6 +64,13 @@ function check(cond, msg) {
   const p4 = await pose();
   check(Math.hypot(p4.x - p3.x, p4.y - p3.y) > 0.1, `pad moves the robot (${JSON.stringify(p4)})`);
 
+  // 座標系(Transformations)の木から robot0・lidar0・odom0 を読み、オドメトリを出す
+  await page.waitForFunction(() => document.getElementById("s_odom").textContent !== "-");
+  const frames = await page.textContent("#s_frames");
+  check(["world", "robot0", "lidar0", "odom0"].every((n) => frames.includes(n)), `frames from transformations/tree (${frames})`);
+  const odom = await page.textContent("#s_odom");
+  check(/^odom0: x -?[\d.]+/.test(odom), `odometry seen from odom0 (${odom})`);
+
   // LiDAR の光線を出してスクリーンショット
   await page.check("#show_rays");
   await page.waitForTimeout(300);

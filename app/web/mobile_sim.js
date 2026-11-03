@@ -2,6 +2,8 @@
 //
 // juiz の HTTP ブローカーの /api/container_process/call で、コンテナ mobile_sim の ContainerProcess を呼ぶ。
 // 使うもの: get_map(画像)・get_map_info・get_state(10 Hz)・set_velocity(10 Hz)・reset_pose
+// juiz 0.2 の Transformations があれば、Anchor ごとの transformations/tree(10 Hz)から
+// ロボット・LiDAR・オドメトリの座標系(world・odom0・robot0・lidar0 など)を描く
 "use strict";
 
 const POLL_MS = 100;
@@ -46,6 +48,20 @@ class MobileSimClient {
   }
 
   state() { return this.call("get_state"); }
+
+  // Anchor ごとの座標系の木。Transformations の無い juiz なら null
+  async frames() {
+    if (this.noFrames) return null;
+    const res = await fetch("/api/anchor/list");
+    if (!res.ok) { this.noFrames = true; return null; }
+    const anchors = await res.json();
+    const trees = await Promise.all(anchors.map(async (a) => {
+      const r = await fetch("/api/transformations/tree?anchor=" + encodeURIComponent(a));
+      if (!r.ok) throw new Error(`transformations/tree: ${r.status} ${await r.text()}`);
+      return r.json();
+    }));
+    return trees;
+  }
   mapInfo() { return this.call("get_map_info"); }
   mapImage() { return this.call("get_map", {}, true); }
   setVelocity(vx, omega, index = 0) {
@@ -81,6 +97,64 @@ class MapView {
   }
 }
 
+// ---- 座標系(Transformations) ----
+
+// "core://core/container/robot0::mobile_robot" → { name: "robot0", type: "mobile_robot" }
+function frameName(identifier) {
+  const tail = identifier.split("/container/").pop();
+  const [name, type] = tail.split("::");
+  return { name, type };
+}
+
+function yawOf(q) { return Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)); }
+
+function toPose2(p) { return { x: p.position.x, y: p.position.y, theta: yawOf(p.orientation) }; }
+
+// a ∘ b(a の座標系で b を見た姿勢を、a の親から見る)
+function compose(a, b) {
+  const c = Math.cos(a.theta), s = Math.sin(a.theta);
+  return { x: a.x + c * b.x - s * b.y, y: a.y + s * b.x + c * b.y, theta: a.theta + b.theta };
+}
+
+function inverse(a) {
+  const c = Math.cos(a.theta), s = Math.sin(a.theta);
+  return { x: -c * a.x - s * a.y, y: s * a.x - c * a.y, theta: -a.theta };
+}
+
+// 木を平らにして { name: { name, type, parent, pose(根の Anchor から見た平面の姿勢) } } にする
+function flatten(tree) {
+  const out = {};
+  const walk = (node, parent) => {
+    const f = frameName(node.identifier);
+    out[f.name] = { ...f, parent, pose: toPose2(node.pose) };
+    for (const c of node.children || []) walk(c, f.name);
+  };
+  walk(tree, null);
+  return out;
+}
+
+// 世界(マップの座標系)の Anchor を決め、他の Anchor(odom0 など)の世界での位置を求める。
+// 他の Anchor の位置 = (世界から見たロボット) ∘ (その Anchor から見たロボット)^-1
+function resolveFrames(trees, worldName) {
+  if (!trees || trees.length === 0) return null;
+  const flat = trees.map(flatten);
+  const rootOf = (f) => Object.values(f).find((n) => n.parent === null);
+  let world = flat.find((f) => rootOf(f).name === worldName) || flat[0];
+  const frames = Object.values(world);
+  const others = [];
+  for (const f of flat) {
+    if (f === world) continue;
+    const root = rootOf(f);
+    const shared = Object.values(f).find((n) => n.parent !== null && world[n.name]);
+    if (!shared) continue;
+    const pose = compose(world[shared.name].pose, inverse(shared.pose));
+    // その Anchor から見た各 Container(オドメトリなら、ロボットが思っている自分の位置)
+    const seen = Object.values(f).filter((n) => n.parent !== null).map((n) => ({ ...n, anchor: root.name }));
+    others.push({ name: root.name, type: root.type, pose, seen });
+  }
+  return { world: rootOf(world).name, frames, others, byName: world };
+}
+
 // ---- 描画 ----
 
 function draw(view, state, trail, opts) {
@@ -99,19 +173,86 @@ function draw(view, state, trail, opts) {
     ctx.stroke();
   }
 
+  const frames = opts.frames;
+  if (frames && opts.showFrames) {
+    // オドメトリの Anchor: ロボットが思っている位置(点線)と、世界から見た Anchor の原点
+    for (const o of frames.others) {
+      for (const n of o.seen) {
+        const r = state.robots.find((x) => x.name === n.name);
+        if (r) drawGhost(ctx, view, n.pose, r.radius);
+      }
+      drawAxes(ctx, view, o.pose, o.name, "#7a3db8");
+    }
+    for (const f of frames.frames) {
+      if (f.type === "mobile_robot") continue; // ロボットの向きは本体に描く
+      // ロボットに載った部品(lidar0 など)の名前は、ロボットの名前と重ならないよう下にずらす
+      drawAxes(ctx, view, f.pose, f.name, f.parent === null ? "#333" : "#c06000", f.parent === null ? 14 : 26);
+    }
+  }
+
   for (const r of state.robots) {
-    drawScan(ctx, view, r, opts.showRays);
+    // LiDAR の位置: 木にロボットの子の mobile_lidar があればその姿勢、無ければ状態の取付位置
+    const lidar = frames && Object.values(frames.byName)
+      .find((n) => n.type === "mobile_lidar" && n.parent === r.name);
+    drawScan(ctx, view, r, opts.showRays, lidar ? lidar.pose : null);
     drawRobot(ctx, view, r);
+    if (frames && opts.showFrames && r.name) {
+      const [cx, cy] = view.toCanvas(r.pose.x, r.pose.y);
+      label(ctx, r.name, cx + 8, cy - 8, "#063");
+    }
   }
 }
 
-function drawScan(ctx, view, r, showRays) {
+function label(ctx, text, x, y, color) {
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
+}
+
+// 座標系の x 軸(赤)と y 軸(緑)を 0.3 m で描く
+function drawAxes(ctx, view, p, name, color, labelDy = 14) {
+  const len = 0.3;
+  const [cx, cy] = view.toCanvas(p.x, p.y);
+  const axis = (a, stroke) => {
+    const [ex, ey] = view.toCanvas(p.x + len * Math.cos(a), p.y + len * Math.sin(a));
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+  };
+  axis(p.theta, "#d22");
+  axis(p.theta + Math.PI / 2, "#1a1");
+  label(ctx, name, cx + 4, cy + labelDy, color);
+}
+
+// オドメトリが思っているロボットの位置(点線の円と向き)
+function drawGhost(ctx, view, p, radius) {
+  const [cx, cy] = view.toCanvas(p.x, p.y);
+  const rad = Math.max(radius * view.pxPerM, 4);
+  ctx.save();
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = "#7a3db8";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rad, 0, 2 * Math.PI);
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + rad * Math.cos(-p.theta), cy + rad * Math.sin(-p.theta));
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawScan(ctx, view, r, showRays, sensor) {
   const s = r.scan;
-  // センサの位置 = ロボットの姿勢に取り付け位置を重ねたもの
-  const c = Math.cos(r.pose.theta), sn = Math.sin(r.pose.theta);
-  const sx = r.pose.x + c * s.mount.x - sn * s.mount.y;
-  const sy = r.pose.y + sn * s.mount.x + c * s.mount.y;
-  const st = r.pose.theta + s.mount.theta;
+  if (!sensor) {
+    // センサの位置 = ロボットの姿勢に取り付け位置を重ねたもの
+    sensor = compose(r.pose, s.mount);
+  }
+  const sx = sensor.x, sy = sensor.y, st = sensor.theta;
   const [scx, scy] = view.toCanvas(sx, sy);
   ctx.lineWidth = 1;
   s.ranges.forEach((range, i) => {
@@ -252,8 +393,14 @@ function setupPlacement(view, client, getState, onPlaced) {
 const $ = (id) => document.getElementById(id);
 const fmt = (v, d = 2) => v.toFixed(d);
 
-function showState(state) {
+function showState(state, frames) {
   const r = state.robots[0];
+  const odom = frames && frames.others.flatMap((o) => o.seen).find((n) => n.name === r.name);
+  $("s_odom").textContent = odom
+    ? `${odom.anchor}: x ${fmt(odom.pose.x)}, y ${fmt(odom.pose.y)}, θ ${fmt(odom.pose.theta)}` : "-";
+  $("s_frames").textContent = frames
+    ? [frames.world, ...frames.frames.filter((f) => f.parent).map((f) => f.name), ...frames.others.map((o) => o.name)].join(", ")
+    : "(Transformations なし)";
   $("s_time").textContent = `${fmt(state.time, 1)} s`;
   $("s_pose").textContent = `x ${fmt(r.pose.x)}, y ${fmt(r.pose.y)}, θ ${fmt(r.pose.theta)}`;
   $("s_vel").textContent = `v ${fmt(r.velocity.vx)}, ω ${fmt(r.velocity.omega)}`;
@@ -291,7 +438,9 @@ async function main() {
 
   const view = new MapView($("map"), await client.mapInfo(), await loadImage(await client.mapImage()));
   const input = new VelocityInput($("pad"));
+  const worldName = params.get("world") || "world";
   let state = null;
+  let frames = null;
   let trail = [];
   let sentZero = true;
   setupPlacement(view, client, () => state, () => { trail = []; });
@@ -300,15 +449,20 @@ async function main() {
 
   setInterval(async () => {
     try {
-      state = await client.state();
+      const [st, trees] = await Promise.all([client.state(), client.frames()]);
+      state = st;
+      frames = resolveFrames(trees, worldName);
       const p = state.robots[0].pose;
       const last = trail[trail.length - 1];
       if (!last || Math.hypot(p.x - last[0], p.y - last[1]) > 0.02) {
         trail.push([p.x, p.y]);
         if (trail.length > TRAIL_MAX) trail.shift();
       }
-      draw(view, state, trail, { showRays: $("show_rays").checked, showTrail: $("show_trail").checked });
-      showState(state);
+      draw(view, state, trail, {
+        showRays: $("show_rays").checked, showTrail: $("show_trail").checked,
+        showFrames: $("show_frames").checked, frames,
+      });
+      showState(state, frames);
 
       // 入力があるあいだは指令を送り続ける(シミュレータは指令が途切れると止まる)
       input.drawPad();
