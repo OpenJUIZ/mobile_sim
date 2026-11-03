@@ -166,6 +166,13 @@ impl World {
         }
     }
 
+    /// ロボット `index` の LiDAR の設定を入れ替える(取付位置を外から与えるとき用)
+    pub fn set_lidar(&mut self, index: usize, lidar: LidarConfig) -> SimResult<()> {
+        lidar.validate()?;
+        self.robot_mut(index)?.lidar = lidar;
+        Ok(())
+    }
+
     /// ロボット `index` のオドメトリの姿勢(odom 座標系)
     pub fn odom_pose(&self, index: usize) -> SimResult<Pose2D> {
         Ok(self.robot(index)?.odom_pose)
@@ -188,6 +195,21 @@ mod tests {
     use super::*;
     use crate::map::Cell;
     use crate::vehicle::DriveKind;
+
+    #[test]
+    fn set_lidar_replaces_config() {
+        let mut w = World::new(corridor());
+        let i = w.spawn(RobotConfig::default()).unwrap();
+        let mut l = LidarConfig {
+            mount: Pose2D::new(0.5, 0.0, 0.0),
+            ..Default::default()
+        };
+        w.set_lidar(i, l.clone()).unwrap();
+        assert_eq!(w.robot(i).unwrap().lidar, l);
+        l.num_beams = 0;
+        assert!(w.set_lidar(i, l).is_err());
+        assert!(w.set_lidar(9, LidarConfig::default()).is_err());
+    }
 
     /// 10 m x 4 m(0.1 m/px)、x = 3.0〜3.1 m に壁
     fn corridor() -> OccupancyGrid {
