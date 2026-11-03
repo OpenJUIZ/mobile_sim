@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "mobile_sim"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "juiz_sdk",
  "juiz_std_types",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "mobile_sim_core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "image 0.25.10",
  "rand",
