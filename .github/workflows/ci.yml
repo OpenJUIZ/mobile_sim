@@ -30,25 +30,17 @@ jobs:
 
   integration:
     # juiz で app/app.conf を起動し、HTTP からプロセスを呼ぶ。
-    # Rust のプラグインは juiz と同じ rustc でビルドしないと読み込めないので、juiz もこのジョブでビルドする
+    # プラグインは C ABI なので、pip の juiz-cli(別の rustc でビルドした juiz)でそのまま読める
     runs-on: ubuntu-latest
-    env:
-      JUIZ_VERSION: "0.1.0"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        id: toolchain
       - uses: Swatinem/rust-cache@v2
-      - name: Cache juiz
-        id: cache-juiz
-        uses: actions/cache@v4
+      - uses: actions/setup-python@v5
         with:
-          path: ~/.cargo/bin/juiz
-          key: juiz-${{ env.JUIZ_VERSION }}-${{ runner.os }}-${{ steps.toolchain.outputs.cachekey }}
+          python-version: "3.12"
       - name: Install juiz
-        if: steps.cache-juiz.outputs.cache-hit != 'true'
-        # 埋め込みの Python は使わないので外す
-        run: cargo install juiz_app --version "$JUIZ_VERSION" --locked --no-default-features
+        run: pip install "juiz-cli==$(sed -n 's/^juiz_sdk = "=\(.*\)"/\1/p' Cargo.toml)"
       - run: scripts/dev_plugin.sh
       - run: python3 scripts/integration_test.py
       - name: UI test (Playwright)

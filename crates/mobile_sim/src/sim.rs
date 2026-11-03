@@ -77,7 +77,7 @@ impl MobileSim {
             .map_err(|e| e.to_string())
     }
 
-    pub fn pose(&self, index: i64) -> Result<Pose2DStamped, String> {
+    pub fn robot_pose(&self, index: i64) -> Result<Pose2DStamped, String> {
         let s = self
             .world
             .state(to_index(index)?)
@@ -324,7 +324,7 @@ mod tests {
         for _ in 0..4 {
             s.step();
         }
-        let p = s.pose(0).unwrap();
+        let p = s.robot_pose(0).unwrap();
         assert!((p.pose.position.x - 0.2).abs() < 1e-9, "{p:?}");
         assert_eq!(p.header.frame_id, "map");
         assert_eq!(p.header.stamp.sec, 0);
@@ -416,7 +416,7 @@ mod tests {
             theta: 0.5,
         };
         s.reset_pose(0, &p).unwrap();
-        assert_eq!(s.pose(0).unwrap().pose, p);
+        assert_eq!(s.robot_pose(0).unwrap().pose, p);
 
         let yaml = room(dir.path());
         let y = yaml.to_str().unwrap();
@@ -442,7 +442,7 @@ mod tests {
         for _ in 0..4 {
             s.step();
         }
-        assert!((s.pose(0).unwrap().pose.position.x - 0.2).abs() < 1e-9);
+        assert!((s.robot_pose(0).unwrap().pose.position.x - 0.2).abs() < 1e-9);
         assert!((s.odom_pose(0).unwrap().pose.position.x - 0.22).abs() < 1e-9);
         assert!((s.odometry(0).unwrap()["pose"]["x"].as_f64().unwrap() - 0.22).abs() < 1e-9);
     }

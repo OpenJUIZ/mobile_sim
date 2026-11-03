@@ -96,7 +96,7 @@ fn mobile_sim_get_pose(
     container: &mut ContainerImpl<MobileSim>,
     index: i64,
 ) -> JuizResult<Pose2DStamped> {
-    container.pose(index).map_err(|e| anyhow!(err(e)))
+    container.robot_pose(index).map_err(|e| anyhow!(err(e)))
 }
 
 #[juiz_component_container_process(

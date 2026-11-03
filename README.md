@@ -18,18 +18,18 @@
 
 ## 使い方
 
-[Releases](https://github.com/OpenJUIZ/mobile_sim/releases) から `.juizapp` を取ってきて、同じ版の juiz で動かします。
+[Releases](https://github.com/OpenJUIZ/mobile_sim/releases) から `.juizapp` を取ってきて、juiz で動かします。
 
 ```sh
-# juiz を入れる。版はパッケージの juizapp.yaml の juiz(Releases の説明にも書きます)と同じにする
-pip install juiz-cli==0.1.0
+# juiz を入れる。版はパッケージの juizapp.yaml の juiz(0.2.0 系以降。Releases の説明にも書きます)に合わせる
+pip install juiz-cli==0.2.0
 
-juiz run mobile_sim-0.1.0.juizapp
+juiz run mobile_sim-<版>.juizapp
 # ブラウザで http://localhost:8000/ を開く
 ```
 
 - Linux(x86_64・arm64)、macOS(Intel・Apple Silicon)、Windows(x86_64)のプラグインが入っています。
-- Rust のプラグインは、juiz と juiz_sdk の版も、juiz をビルドした rustc の版も一致しないと読み込めません。パッケージは pip の `juiz-cli` と同じ rustc でビルドしているので、`cargo install` で入れた juiz では動かないことがあります。
+- プラグインは juiz の C ABI で作っているので、pip の `juiz-cli` でも `cargo install juiz_app` で入れた juiz でも動きます(juiz をビルドした rustc の版は問いません)。v0.2.0 までのパッケージは juiz 0.1.0 が要ります。
 - 基礎パッケージ(`kind: base`)なので、別の juiz アプリから `depends: { mobile_sim: "^0.1" }` でつなげます(IPC の名前は `mobile_sim`)。
 
 ### Docker
@@ -47,7 +47,7 @@ docker run --rm -p 8000:8000 ghcr.io/openjuiz/mobile_sim
   ```
 
 - `docker compose -f docker/compose.yml up` でも動きます(手元でビルドするときは `--build` を付ける)。
-- イメージの中では juiz とプラグインを同じ rustc でビルドしているので、juiz を別に入れる必要はありません。
+- イメージには juiz も入っているので、juiz を別に入れる必要はありません。
 
 mapconf の例:
 
@@ -77,11 +77,11 @@ cargo build --workspace   # target/debug/libmobile_sim.so などができる
 cargo test --workspace
 ```
 
-Rust 1.88 以降が要ります。juiz_sdk は `=0.1.0` に固定しています(Rust のプラグインは juiz と juiz_sdk の版が一致しないと読み込めないため)。
+Rust 1.88 以降が要ります。juiz_sdk は `=0.2.0` に固定しています(パッケージの中のプラグインは同じ juiz_sdk でそろえるため)。
 
 ### juiz で動かす
 
-`juiz` 0.1.0 を、プラグインと同じ rustc でビルドして入れます(`cargo install juiz_app --version 0.1.0 --locked`)。
+`juiz` 0.2.0 を入れます(`pip install juiz-cli==0.2.0` か `cargo install juiz_app --version 0.2.0 --locked`)。
 
 ```sh
 scripts/dev_plugin.sh            # プラグインをビルドして app/plugins/<target>/ に置く
@@ -94,15 +94,13 @@ python3 scripts/integration_test.py   # 別の端末で。juiz を起動して H
 CI の Release ワークフローが、ターゲットごとにプラグインをビルドして `.juizapp` にまとめ、`juiz run` で結合テストをします。タグ `v<版>`(`app/juizapp.yaml` の `version` と同じ)を push するか、GitHub の画面でそのタグの Release を作ると、Releases に `.juizapp` が載ります。手元では次のとおりです。
 
 ```sh
-python3 scripts/juiz_rustc.py 0.1.0           # pip の juiz-cli をビルドした rustc の版(1.99.1)
-rustup toolchain install 1.99.1
-cargo +1.99.1 build -p mobile_sim --release
+cargo build -p mobile_sim --release
 mkdir -p /tmp/plugins/x86_64-unknown-linux-gnu && cp target/release/libmobile_sim.so /tmp/plugins/x86_64-unknown-linux-gnu/
-scripts/pack.sh /tmp/plugins dist            # dist/mobile_sim-0.1.0.juizapp
-python3 scripts/integration_test.py --juizapp dist/mobile_sim-0.1.0.juizapp
+scripts/pack.sh /tmp/plugins dist            # dist/mobile_sim-<版>.juizapp
+python3 scripts/integration_test.py --juizapp dist/mobile_sim-<版>.juizapp
 ```
 
-juiz の新しい版に合わせるときは、`Cargo.toml` の `juiz_sdk`・`juiz_std_types` と `app/juizapp.yaml` の `juiz` を上げます。rustc の版は CI が juiz-cli の wheel から読みます。
+juiz の新しい版に合わせるときは、`Cargo.toml` の `juiz_sdk`・`juiz_std_types` と `app/juizapp.yaml` の `juiz`(`>=<版>`)を上げます。
 
 ### ブラウザ画面
 
