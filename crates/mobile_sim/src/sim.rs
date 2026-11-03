@@ -10,7 +10,7 @@ use juiz_std_types::sensor::LaserScan;
 use mobile_sim_core as core;
 use mobile_sim_core::{Cell, MapConf, OccupancyGrid, RobotConfig, Scan, StepClock, World};
 
-use crate::config::{parse_robots, parse_step};
+use crate::config::{parse_robots, parse_step, LidarSetting, RobotSetting};
 
 /// conf の `map` を上書きする環境変数(Docker でマップを差し替えるとき用)
 pub const MAP_ENV: &str = "MOBILE_SIM_MAP";
@@ -24,6 +24,8 @@ pub struct MobileSim {
     map_path: PathBuf,
     map_conf: MapConf,
     map_image: DynamicImage,
+    /// ロボットごとの Container の名前(conf の `robots:` で作ったロボットは None)
+    names: Vec<Option<String>>,
 }
 
 impl MobileSim {
@@ -38,10 +40,12 @@ impl MobileSim {
         let (grid, map_conf) = load_map(&map_path)?;
         let map_image = render_map(&grid);
         let mut world = World::with_seed(grid, seed);
+        let mut names = Vec::new();
         for r in parse_robots(robots)? {
             world
                 .spawn(RobotConfig::from(&r))
                 .map_err(|e| e.to_string())?;
+            names.push(None);
         }
         let clock = parse_step(step)?.clock()?;
         Ok(Self {
@@ -50,7 +54,60 @@ impl MobileSim {
             map_path,
             map_conf,
             map_image,
+            names,
         })
+    }
+
+    /// Container `mobile_robot` の名前 `name` でロボットを足し、その番号を返す
+    pub fn add_robot(&mut self, name: &str, setting: &RobotSetting) -> Result<usize, String> {
+        if self.robot_index(name).is_ok() {
+            return Err(format!("robot '{name}' already exists"));
+        }
+        let i = self
+            .world
+            .spawn(RobotConfig::from(setting))
+            .map_err(|e| e.to_string())?;
+        self.names.push(Some(name.to_owned()));
+        Ok(i)
+    }
+
+    /// Container の名前からロボットの番号を引く
+    pub fn robot_index(&self, name: &str) -> Result<usize, String> {
+        self.names
+            .iter()
+            .position(|n| n.as_deref() == Some(name))
+            .ok_or_else(|| format!("no robot named '{name}' in this simulator"))
+    }
+
+    /// ロボット `index` の LiDAR の設定と取付位置(ロボットから見た位置)を入れ替える
+    pub fn set_lidar(
+        &mut self,
+        index: usize,
+        setting: &LidarSetting,
+        mount: core::Pose2D,
+    ) -> Result<(), String> {
+        let mut config = core::LidarConfig::from(setting);
+        config.mount = mount;
+        self.world
+            .set_lidar(index, config)
+            .map_err(|e| e.to_string())
+    }
+
+    /// ロボット `index` の真の姿勢とオドメトリの姿勢と時刻
+    pub fn poses(&self, index: usize) -> Result<(core::Pose2D, core::Pose2D, f64), String> {
+        let s = self.world.state(index).map_err(|e| e.to_string())?;
+        let o = self.world.odom_pose(index).map_err(|e| e.to_string())?;
+        Ok((s.pose, o, self.world.time()))
+    }
+
+    /// ロボット `index` の LiDAR で走査し、frame_id を `frame_id` にする
+    pub fn scan_as(&mut self, index: usize, frame_id: &str) -> Result<LaserScan, String> {
+        let scan = self.world.scan(index).map_err(|e| e.to_string())?;
+        Ok(to_laser_scan(&scan, self.world.time(), frame_id))
+    }
+
+    pub fn time(&self) -> f64 {
+        self.world.time()
     }
 
     pub fn world(&self) -> &World {
@@ -114,11 +171,7 @@ impl MobileSim {
     }
 
     pub fn scan(&mut self, index: i64) -> Result<LaserScan, String> {
-        let scan = self
-            .world
-            .scan(to_index(index)?)
-            .map_err(|e| e.to_string())?;
-        Ok(to_laser_scan(&scan, self.world.time()))
+        self.scan_as(to_index(index)?, "laser")
     }
 
     pub fn map_image(&self) -> DynamicImage {
@@ -159,6 +212,7 @@ impl MobileSim {
                 let s = self.world.state(i).expect("index in range");
                 let scan = self.world.scan(i).expect("index in range");
                 json!({
+                    "name": self.names.get(i).cloned().flatten(),
                     "pose": pose_json(&s.pose),
                     "velocity": twist_json(&s.velocity),
                     "target_velocity": twist_json(&s.target_velocity),
@@ -219,7 +273,7 @@ pub fn render_map(g: &OccupancyGrid) -> DynamicImage {
     DynamicImage::ImageLuma8(img)
 }
 
-fn header(time: f64, frame_id: &str) -> Header {
+pub fn header(time: f64, frame_id: &str) -> Header {
     let sec = time.floor();
     Header {
         stamp: Time {
@@ -230,7 +284,7 @@ fn header(time: f64, frame_id: &str) -> Header {
     }
 }
 
-fn to_pose(p: &core::Pose2D) -> Pose2D {
+pub fn to_pose(p: &core::Pose2D) -> Pose2D {
     Pose2D {
         position: Point2D { x: p.x, y: p.y },
         theta: p.theta,
@@ -254,9 +308,9 @@ fn out_of_range(r: f64, range_max: f64) -> f64 {
     }
 }
 
-fn to_laser_scan(s: &Scan, time: f64) -> LaserScan {
+fn to_laser_scan(s: &Scan, time: f64, frame_id: &str) -> LaserScan {
     LaserScan {
-        header: header(time, "laser"),
+        header: header(time, frame_id),
         angle_min: s.angle_min as f32,
         angle_max: s.angle_max as f32,
         angle_increment: s.angle_increment as f32,

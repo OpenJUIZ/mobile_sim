@@ -76,9 +76,9 @@ def wait_ready(base, proc, log):
     sys.exit("juiz did not become ready")
 
 
-def call(base, name, kind, args=None, raw=False):
-    """コンテナ sim0 の ContainerProcess `name`(型 mobile_sim_<kind>)を呼ぶ"""
-    ident = f"{base}/container_process/{name}::mobile_sim_{kind}:sim0"
+def call(base, name, kind, args=None, raw=False, container="sim0", ctype="mobile_sim"):
+    """コンテナ `container` の ContainerProcess `name`(型 <ctype>_<kind>)を呼ぶ"""
+    ident = f"{base}/container_process/{name}::{ctype}_{kind}:{container}"
     url = f"{base}/api/container_process/call?identifier=" + urllib.parse.quote(ident, safe="")
     req = urllib.request.Request(
         url,
@@ -98,6 +98,21 @@ def push_topic(base, topic, value):
     )
     with urllib.request.urlopen(req, timeout=5) as r:
         r.read()
+
+
+def api(base, path, query=None, body=None, method="GET"):
+    url = f"{base}/api/{path}"
+    if query:
+        url += "?" + urllib.parse.urlencode(query)
+    data = None if body is None else json.dumps(body).encode()
+    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return json.loads(r.read())
+
+
+def yaw(q):
+    import math
+    return math.atan2(2.0 * (q["w"] * q["z"] + q["x"] * q["y"]), 1.0 - 2.0 * (q["y"] ** 2 + q["z"] ** 2))
 
 
 def velocity(vx, omega=0.0):
@@ -142,12 +157,16 @@ def run_checks(base):
 
     op = call(base, "get_odom_pose0", "get_odom_pose")
     check(op["header"]["frame_id"] == "odom", f"get_odom_pose is in the odom frame ({op['header']})")
+    check_transformations(base)
     check(abs(op["pose"]["position"]["x"] - odo["pose"]["x"]) < 1e-9, "odometry pose matches get_odom_pose")
 
     # sensor_ec が odom と scan をトピックに出している
     with urllib.request.urlopen(f"{base}/api/topic/list", timeout=5) as r:
         topics = json.dumps(json.load(r))
-    check('"odom"' in topics and '"scan"' in topics, f"topics odom and scan exist ({topics[:200]})")
+    check(
+        all(f'"{t}"' in topics for t in ["odom", "scan", "lidar_mount"]),
+        f"topics odom, scan and lidar_mount exist ({topics[:200]})",
+    )
 
     scan = call(base, "get_scan0", "get_scan")
     check(len(scan["ranges"]) == 271, "scan has 271 beams")
@@ -171,6 +190,44 @@ def run_checks(base):
     st = call(base, "get_state0", "get_state")["robots"][0]
     check(st["pose"]["x"] < 1.5 - 0.2 + 1e-6, f"robot stops before the wall ({st['pose']})")
     check(st["bumper"], "bumper is set at the wall")
+
+
+def check_transformations(base):
+    """robot0・lidar0 の ContainerPose と Transform(docs/transformations-plan.md)"""
+    robot = lambda kind, args=None: call(base, f"{kind}0" if kind != "update" else "update0", kind, args, container="robot0", ctype="mobile_robot")
+    lidar = lambda name, kind: call(base, name, kind, container="lidar0", ctype="mobile_lidar")
+    time.sleep(0.2)
+    truth = call(base, "get_pose0", "get_pose")["pose"]
+    p = api(base, "container/pose", {"identifier": "robot0", "reference": "world"})
+    check(
+        abs(p["pose"]["position"]["x"] - truth["position"]["x"]) < 0.1
+        and abs(yaw(p["pose"]["orientation"]) - truth["theta"]) < 0.1,
+        f"ContainerPose of robot0 from world is the true pose ({p['pose']['position']})",
+    )
+    odom = robot("update")
+    o = api(base, "container/pose", {"identifier": "robot0", "reference": "odom0"})
+    check(odom["header"]["frame_id"] == "odom0", f"mobile_robot_update returns odometry in odom0 ({odom['header']})")
+    check(abs(o["pose"]["position"]["x"] - odom["pose"]["position"]["x"]) < 0.1, "ContainerPose of robot0 from odom0 is the odometry")
+    tree = api(base, "transformations/tree", {"anchor": "world"})
+    names = json.dumps(tree)
+    check("robot0::mobile_robot" in names and "lidar0::mobile_lidar" in names, "tree of world has robot0 and lidar0")
+    l = api(base, "container/pose", {"identifier": "lidar0", "reference": "robot0"})
+    check(abs(l["pose"]["position"]["z"] - 0.2) < 1e-9, f"lidar0 is mounted 0.2 m above robot0 ({l['pose']['position']})")
+    scan = lidar("scan0", "scan")
+    check(scan["header"]["frame_id"] == "lidar0" and len(scan["ranges"]) == 271, "mobile_lidar_scan is in the lidar0 frame")
+    m = lidar("mount0", "mount")
+    check(m["header"]["frame_id"] == "robot0", f"mobile_lidar_mount is seen from robot0 ({m['header']})")
+    # 取付位置を Transform で変えると、走査と画面の取付位置が追従する
+    tid = next(t for t in api(base, "transform/list") if "lidar0" in t)
+    api(base, "transform/update", {"identifier": tid}, {"translation": {"x": 0.1, "y": 0.0, "z": 0.2}}, method="PATCH")
+    lidar("scan0", "scan")
+    m = lidar("mount0", "mount")
+    st = call(base, "get_state0", "get_state")["robots"][0]
+    check(
+        abs(m["pose"]["position"]["x"] - 0.1) < 1e-9 and abs(st["scan"]["mount"]["x"] - 0.1) < 1e-9,
+        f"changing the transform robot0 -> lidar0 moves the LiDAR ({st['scan']['mount']})",
+    )
+    check(st["name"] == "robot0", "get_state names the robot")
 
 
 if __name__ == "__main__":

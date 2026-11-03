@@ -201,18 +201,11 @@ impl From<&RobotSetting> for RobotConfig {
     }
 }
 
-/// `robots` を読む。省けば既定のロボット 1 台
+/// `robots` を読む。省けば既定のロボット 1 台、`[]` ならロボット無し(Container `mobile_robot` で足すとき)
 pub fn parse_robots(v: Option<&serde_json::Value>) -> Result<Vec<RobotSetting>, String> {
     match v {
         None | Some(serde_json::Value::Null) => Ok(vec![RobotSetting::default()]),
-        Some(v) => {
-            let robots: Vec<RobotSetting> =
-                serde_json::from_value(v.clone()).map_err(|e| format!("invalid robots: {e}"))?;
-            if robots.is_empty() {
-                return Err("robots must have at least one robot".to_owned());
-            }
-            Ok(robots)
-        }
+        Some(v) => serde_json::from_value(v.clone()).map_err(|e| format!("invalid robots: {e}")),
     }
 }
 
@@ -273,9 +266,9 @@ mod tests {
     }
 
     #[test]
-    fn rejects_typos_and_empty() {
+    fn rejects_typos_and_allows_empty() {
         assert!(parse_robots(Some(&json!([{"radious": 0.3}]))).is_err());
-        assert!(parse_robots(Some(&json!([]))).is_err());
+        assert!(parse_robots(Some(&json!([]))).unwrap().is_empty());
         assert!(parse_robots(Some(&json!([{"odometry": {"noise": 0.1}}]))).is_err());
         assert!(parse_robots(Some(&json!([{"drive": "tank"}]))).is_err());
         assert!(parse_step(Some(&json!({"mode": "warp"}))).is_err());

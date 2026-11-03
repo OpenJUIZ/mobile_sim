@@ -60,6 +60,24 @@ free_thresh: 0.196
 negate: 0
 ```
 
+## 座標系(Transformations)
+
+juiz 0.2.0 の Transformations を使い、ロボットと LiDAR を 1 台ずつ Container にして位置を ContainerPose として持たせています(計画は [docs/transformations-plan.md](docs/transformations-plan.md))。
+
+```text
+world (static_anchor)            真の座標系(地図画像の座標と同じ)
+  └─ robot0 (mobile_robot)       真の位置。robot0 の update が毎周期書く
+       └─ lidar0 (mobile_lidar)  取付位置。conf の transforms: に書く
+odom0 (static_anchor)            ロボット 0 のオドメトリの原点
+  └─ robot0                      オドメトリ(誤差入り)
+```
+
+- 位置は `juiz container pose robot0 --reference world`、木は `juiz anchor tree world`、HTTP では `/api/container/pose?identifier=lidar0&reference=world` で読めます。管理画面にも木が出ます。
+- LiDAR の取付位置を変えるときは conf の `robot0 -> lidar0` の Transform を直します(`juiz transform update robot0 lidar0 --translation 0.1,0,0.2` で動かしたままでも変えられます)。
+- トピック: `odom`(`Pose2DStamped`、frame `odom0`)、`scan`(`LaserScan`、frame `lidar0`)、`lidar_mount`(`PoseStamped`、robot0 から見た lidar0。別の System の mapper 用)。速度はトピック `cmd_vel` で受けます。
+- ロボットを増やすときは `odom1`・`robot1`・`lidar1` と Transform を足し、`mobile_robot` の `odom` を `odom1` に、`mobile_lidar` の `base` を `robot1` にします。`sim0` は `robots: []` にして、ロボットより前に書きます。
+- `sim0` の `index` つきの Process(`mobile_sim_get_pose` など)と conf の `robots:` は 0.3 系では残しています(0.4 で消す予定)。
+
 ## 構成(予定)
 
 | パス | 中身 |
