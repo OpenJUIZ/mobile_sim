@@ -8,6 +8,7 @@ use crate::error::{SimError, SimResult};
 use crate::geometry::{Pose2D, Twist2D};
 use crate::lidar::{self, LidarConfig, Scan};
 use crate::map::OccupancyGrid;
+use crate::odometry::OdometryConfig;
 use crate::vehicle::{Vehicle, VehicleConfig};
 
 /// ロボット 1 台の設定
@@ -15,6 +16,7 @@ use crate::vehicle::{Vehicle, VehicleConfig};
 pub struct RobotConfig {
     pub vehicle: VehicleConfig,
     pub lidar: LidarConfig,
+    pub odometry: OdometryConfig,
     pub initial_pose: Pose2D,
 }
 
@@ -27,6 +29,9 @@ pub struct Robot {
     pub bumper: bool,
     /// 走った距離の合計 [m](オドメトリ用)
     pub distance: f64,
+    pub odometry: OdometryConfig,
+    /// オドメトリの姿勢(odom 座標系)。初期姿勢から始め、誤差が積もる。`reset_pose` では変えない
+    pub odom_pose: Pose2D,
 }
 
 /// ロボット 1 台の状態の写し(画面や juiz の出力用)
@@ -48,6 +53,8 @@ pub struct World {
     pub unknown_is_obstacle: bool,
     time: f64,
     rng: StdRng,
+    /// オドメトリの誤差用(LiDAR の乱数列と別にして、片方の設定がもう片方の結果を変えないようにする)
+    odom_rng: StdRng,
 }
 
 impl World {
@@ -63,6 +70,7 @@ impl World {
             unknown_is_obstacle: true,
             time: 0.0,
             rng: StdRng::seed_from_u64(seed),
+            odom_rng: StdRng::seed_from_u64(seed ^ 0x6f64_6f6d),
         }
     }
 
@@ -84,11 +92,16 @@ impl World {
     pub fn spawn(&mut self, config: RobotConfig) -> SimResult<usize> {
         config.vehicle.validate()?;
         config.lidar.validate()?;
+        config.odometry.validate()?;
+        let vehicle = Vehicle::new(config.vehicle, config.initial_pose);
+        let odom_pose = vehicle.pose;
         self.robots.push(Robot {
-            vehicle: Vehicle::new(config.vehicle, config.initial_pose),
+            vehicle,
             lidar: config.lidar,
             bumper: false,
             distance: 0.0,
+            odometry: config.odometry,
+            odom_pose,
         });
         Ok(self.robots.len() - 1)
     }
@@ -144,10 +157,18 @@ impl World {
                 r.bumper = true;
             } else {
                 r.distance += (next.x - r.vehicle.pose.x).hypot(next.y - r.vehicle.pose.y);
+                r.odom_pose =
+                    r.odometry
+                        .advance(&r.odom_pose, &r.vehicle.pose, &next, &mut self.odom_rng);
                 r.vehicle.pose = next;
                 r.bumper = false;
             }
         }
+    }
+
+    /// ロボット `index` のオドメトリの姿勢(odom 座標系)
+    pub fn odom_pose(&self, index: usize) -> SimResult<Pose2D> {
+        Ok(self.robot(index)?.odom_pose)
     }
 
     /// ロボット `index` の LiDAR で走査する
@@ -256,6 +277,50 @@ mod tests {
                 ..Default::default()
             },
             ..Default::default()
+        };
+        assert!(w.spawn(bad).is_err());
+    }
+
+    #[test]
+    fn odometry_follows_truth_without_noise_and_drifts_with_it() {
+        let mut w = World::new(corridor());
+        let exact = w.spawn(fast_robot()).unwrap();
+        let noisy = w
+            .spawn(RobotConfig {
+                odometry: OdometryConfig {
+                    linear_noise: 0.05,
+                    angular_noise: 0.05,
+                    drift_noise: 0.05,
+                    ..Default::default()
+                },
+                ..fast_robot()
+            })
+            .unwrap();
+        for id in [exact, noisy] {
+            w.set_velocity(id, Twist2D::new(0.5, 0.0, 0.5)).unwrap();
+        }
+        for _ in 0..200 {
+            w.step(0.01);
+        }
+        let truth = w.state(exact).unwrap().pose;
+        let odom = w.odom_pose(exact).unwrap();
+        assert!((truth.x - odom.x).abs() < 1e-12 && (truth.theta - odom.theta).abs() < 1e-12);
+        let truth = w.state(noisy).unwrap().pose;
+        let odom = w.odom_pose(noisy).unwrap();
+        let err = (truth.x - odom.x).hypot(truth.y - odom.y) + (truth.theta - odom.theta).abs();
+        assert!(err > 1e-4, "{truth:?} {odom:?}");
+
+        // reset_pose はオドメトリを変えない(瞬間移動は車輪で測れない)
+        w.reset_pose(noisy, Pose2D::new(-1.0, 1.0, 0.0)).unwrap();
+        assert_eq!(w.odom_pose(noisy).unwrap(), odom);
+        assert!(w.odom_pose(9).is_err());
+
+        let bad = RobotConfig {
+            odometry: OdometryConfig {
+                linear_scale: -1.0,
+                ..Default::default()
+            },
+            ..fast_robot()
         };
         assert!(w.spawn(bad).is_err());
     }

@@ -20,6 +20,7 @@ pub mod error;
 pub mod geometry;
 pub mod lidar;
 pub mod map;
+pub mod odometry;
 pub mod vehicle;
 pub mod world;
 
@@ -28,6 +29,7 @@ pub use error::{SimError, SimResult};
 pub use geometry::{normalize_angle, Pose2D, Twist2D};
 pub use lidar::{LidarConfig, Scan};
 pub use map::{Cell, MapConf, OccupancyGrid};
+pub use odometry::OdometryConfig;
 pub use vehicle::{DriveKind, Vehicle, VehicleConfig};
 pub use world::{Robot, RobotConfig, RobotState, World};
 

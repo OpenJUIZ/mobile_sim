@@ -12,12 +12,13 @@
 //!         radius: 0.2
 //!         initial_pose: { x: 0.0, y: 0.0, theta: 0.0 }
 //!         lidar: { num_beams: 200, range_max: 10.0 }
+//!         odometry: { linear_noise: 0.02, angular_noise: 0.02, drift_noise: 0.01 }
 //! ```
 //! 書かない項目は既定値(mobile_sim_core の Default)になる。
 
 use juiz_sdk::serde_json;
 use mobile_sim_core::{
-    DriveKind, LidarConfig, Pose2D, RobotConfig, StepClock, Twist2D, VehicleConfig,
+    DriveKind, LidarConfig, OdometryConfig, Pose2D, RobotConfig, StepClock, Twist2D, VehicleConfig,
 };
 use serde::Deserialize;
 
@@ -134,6 +135,30 @@ impl From<&LidarSetting> for LidarConfig {
     }
 }
 
+/// オドメトリの誤差。書かなければ誤差無し
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OdometrySetting {
+    pub linear_scale: Option<f64>,
+    pub angular_scale: Option<f64>,
+    pub linear_noise: Option<f64>,
+    pub angular_noise: Option<f64>,
+    pub drift_noise: Option<f64>,
+}
+
+impl From<&OdometrySetting> for OdometryConfig {
+    fn from(s: &OdometrySetting) -> Self {
+        let d = OdometryConfig::default();
+        OdometryConfig {
+            linear_scale: s.linear_scale.unwrap_or(d.linear_scale),
+            angular_scale: s.angular_scale.unwrap_or(d.angular_scale),
+            linear_noise: s.linear_noise.unwrap_or(d.linear_noise),
+            angular_noise: s.angular_noise.unwrap_or(d.angular_noise),
+            drift_noise: s.drift_noise.unwrap_or(d.drift_noise),
+        }
+    }
+}
+
 /// `robots` の 1 要素
 #[derive(Clone, Debug, Default, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -148,6 +173,8 @@ pub struct RobotSetting {
     pub initial_pose: PoseSetting,
     #[serde(default)]
     pub lidar: LidarSetting,
+    #[serde(default)]
+    pub odometry: OdometrySetting,
 }
 
 impl From<&RobotSetting> for RobotConfig {
@@ -168,6 +195,7 @@ impl From<&RobotSetting> for RobotConfig {
                 command_timeout: s.command_timeout.unwrap_or(d.command_timeout),
             },
             lidar: (&s.lidar).into(),
+            odometry: (&s.odometry).into(),
             initial_pose: s.initial_pose.into(),
         }
     }
@@ -218,7 +246,8 @@ mod tests {
             "max_velocity": {"vx": 2.0, "vy": 1.0, "omega": 1.5},
             "command_timeout": 0.0,
             "initial_pose": {"x": 1.0, "theta": 0.5},
-            "lidar": {"num_beams": 360, "range_max": 20.0, "mount": {"x": 0.1}}
+            "lidar": {"num_beams": 360, "range_max": 20.0, "mount": {"x": 0.1}},
+            "odometry": {"linear_scale": 1.02, "drift_noise": 0.01}
         }, {}]);
         let robots = parse_robots(Some(&v)).unwrap();
         assert_eq!(robots.len(), 2);
@@ -236,12 +265,18 @@ mod tests {
         assert_eq!(c.lidar.range_max, 20.0);
         assert_eq!(c.lidar.mount, Pose2D::new(0.1, 0.0, 0.0));
         assert_eq!(c.lidar.angle_min, LidarConfig::default().angle_min);
+        assert_eq!(c.odometry.linear_scale, 1.02);
+        assert_eq!(c.odometry.drift_noise, 0.01);
+        assert_eq!(c.odometry.angular_scale, 1.0);
+        let c1: RobotConfig = (&robots[1]).into();
+        assert!(c1.odometry.is_exact());
     }
 
     #[test]
     fn rejects_typos_and_empty() {
         assert!(parse_robots(Some(&json!([{"radious": 0.3}]))).is_err());
         assert!(parse_robots(Some(&json!([]))).is_err());
+        assert!(parse_robots(Some(&json!([{"odometry": {"noise": 0.1}}]))).is_err());
         assert!(parse_robots(Some(&json!([{"drive": "tank"}]))).is_err());
         assert!(parse_step(Some(&json!({"mode": "warp"}))).is_err());
     }

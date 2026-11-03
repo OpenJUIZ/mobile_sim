@@ -1,7 +1,7 @@
 """juiz で app/app.conf を起動し、HTTP からプロセスを呼んで動作を確かめる(M2 の結合テスト)
 
 使い方: scripts/dev_plugin.sh && python3 scripts/integration_test.py [--juiz <juiz のパス>] [--port 18000]
-       python3 scripts/integration_test.py --juizapp dist/mobile_sim-0.1.0.juizapp   # juiz run で起動する(ポートは 8000)
+       python3 scripts/integration_test.py --juizapp dist/mobile_sim-0.2.0.juizapp   # juiz run で起動する(ポートは 8000)
 """
 import os
 import argparse
@@ -91,6 +91,15 @@ def call(base, name, kind, args=None, raw=False):
         return (r.headers.get("Content-Type"), body) if raw else json.loads(body)
 
 
+def push_topic(base, topic, value):
+    url = f"{base}/api/topic/push?topic_name=" + urllib.parse.quote(topic)
+    req = urllib.request.Request(
+        url, data=json.dumps({"input": value}).encode(), method="PATCH", headers={"Content-Type": "application/json"}
+    )
+    with urllib.request.urlopen(req, timeout=5) as r:
+        r.read()
+
+
 def velocity(vx, omega=0.0):
     return {"velocity": {"linear": {"x": vx, "y": 0.0}, "angular": omega}}
 
@@ -118,10 +127,27 @@ def run_checks(base):
     p1 = call(base, "get_pose0", "get_pose")["pose"]
     check(p1["position"]["x"] > p0["position"]["x"] + 0.1, f"set_velocity moves the robot ({p1})")
 
+    # トピック cmd_vel に速度を出しても動く(set_velocity0 が subscribes している)
+    before = call(base, "get_pose0", "get_pose")["pose"]
+    for _ in range(10):
+        push_topic(base, "cmd_vel", velocity(0.5)["velocity"])
+        time.sleep(0.1)
+    after = call(base, "get_pose0", "get_pose")["pose"]
+    check(after["position"]["x"] > before["position"]["x"] + 0.1, f"topic cmd_vel moves the robot ({after})")
+
     time.sleep(1.5)
     odo = call(base, "get_odometry0", "get_odometry")
     check(odo["twist"]["vx"] == 0.0, f"robot stops after command_timeout ({odo['twist']})")
     check(odo["distance"] > 0.1, "odometry distance accumulates")
+
+    op = call(base, "get_odom_pose0", "get_odom_pose")
+    check(op["header"]["frame_id"] == "odom", f"get_odom_pose is in the odom frame ({op['header']})")
+    check(abs(op["pose"]["position"]["x"] - odo["pose"]["x"]) < 1e-9, "odometry pose matches get_odom_pose")
+
+    # sensor_ec が odom と scan をトピックに出している
+    with urllib.request.urlopen(f"{base}/api/topic/list", timeout=5) as r:
+        topics = json.dumps(json.load(r))
+    check('"odom"' in topics and '"scan"' in topics, f"topics odom and scan exist ({topics[:200]})")
 
     scan = call(base, "get_scan0", "get_scan")
     check(len(scan["ranges"]) == 271, "scan has 271 beams")
