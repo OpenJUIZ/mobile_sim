@@ -176,13 +176,15 @@ function draw(view, state, trail, opts) {
   const frames = opts.frames;
   if (frames && opts.showFrames) {
     // オドメトリの Anchor: ロボットが思っている位置(点線)と、世界から見た Anchor の原点
-    for (const o of frames.others) {
+    // Anchor ごとに色を変える(odom0 のオドメトリ、別 System の写しの map の SLAM の推定など)
+    frames.others.forEach((o, i) => {
+      const color = OTHER_COLORS[i % OTHER_COLORS.length];
       for (const n of o.seen) {
         const r = state.robots.find((x) => x.name === n.name);
-        if (r) drawGhost(ctx, view, n.pose, r.radius);
+        if (r) drawGhost(ctx, view, n.pose, r.radius, color);
       }
-      drawAxes(ctx, view, o.pose, o.name, "#7a3db8");
-    }
+      drawAxes(ctx, view, o.pose, o.name, color);
+    });
     for (const f of frames.frames) {
       if (f.type === "mobile_robot") continue; // ロボットの向きは本体に描く
       // ロボットに載った部品(lidar0 など)の名前は、ロボットの名前と重ならないよう下にずらす
@@ -230,13 +232,15 @@ function drawAxes(ctx, view, p, name, color, labelDy = 14) {
   label(ctx, name, cx + 4, cy + labelDy, color);
 }
 
-// オドメトリが思っているロボットの位置(点線の円と向き)
-function drawGhost(ctx, view, p, radius) {
+const OTHER_COLORS = ["#7a3db8", "#0b7fa8", "#b8860b"];
+
+// オドメトリや SLAM が思っているロボットの位置(点線の円と向き)
+function drawGhost(ctx, view, p, radius, color) {
   const [cx, cy] = view.toCanvas(p.x, p.y);
   const rad = Math.max(radius * view.pxPerM, 4);
   ctx.save();
   ctx.setLineDash([4, 3]);
-  ctx.strokeStyle = "#7a3db8";
+  ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(cx, cy, rad, 0, 2 * Math.PI);
@@ -395,9 +399,11 @@ const fmt = (v, d = 2) => v.toFixed(d);
 
 function showState(state, frames) {
   const r = state.robots[0];
-  const odom = frames && frames.others.flatMap((o) => o.seen).find((n) => n.name === r.name);
-  $("s_odom").textContent = odom
-    ? `${odom.anchor}: x ${fmt(odom.pose.x)}, y ${fmt(odom.pose.y)}, θ ${fmt(odom.pose.theta)}` : "-";
+  // ほかの Anchor から見たロボット(odom0 ならオドメトリ、写しの map なら SLAM の推定)
+  const seen = frames ? frames.others.flatMap((o) => o.seen).filter((n) => n.name === r.name) : [];
+  const lines = seen.length
+    ? seen.map((n) => `${n.anchor}: x ${fmt(n.pose.x)}, y ${fmt(n.pose.y)}, θ ${fmt(n.pose.theta)}`) : ["-"];
+  $("s_odom").replaceChildren(...lines.map((t) => Object.assign(document.createElement("div"), { textContent: t })));
   $("s_frames").textContent = frames
     ? [frames.world, ...frames.frames.filter((f) => f.parent).map((f) => f.name), ...frames.others.map((o) => o.name)].join(", ")
     : "(Transformations なし)";
