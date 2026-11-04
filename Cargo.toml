@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/mobile_sim_core", "crates/mobile_sim"]
 
 [workspace.package]
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/OpenJUIZ/mobile_sim"
@@ -11,6 +11,6 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 # Rust のプラグインは、読み込む juiz と juiz_sdk の版が完全に一致しないと動かない(juiz の docs/spec/app-package.md §4.3)
-juiz_sdk = "=0.2.1"
-juiz_std_types = "=0.2.1"
+juiz_sdk = "=0.2.2"
+juiz_std_types = "=0.2.2"
 mobile_sim_core = { path = "crates/mobile_sim_core" }

@@ -16,6 +16,10 @@
 //! | `mobile_sim_load_map` | `map`(mapconf のパス) | なし |
 //! | `mobile_sim_reset_pose` | `pose: Pose2D`, `index` | なし |
 //! | `mobile_sim_get_state` | なし | 全ロボットの姿勢・速度・スキャン |
+//!
+//! 読むだけの処理(`get_pose`・`get_odometry`・`get_odom_pose`・`get_map`・`get_map_info`、`mobile_lidar_mount`)は
+//! Container を `&ContainerImpl` で受け取る readonly の ContainerProcess(juiz 0.2.2、#377)。
+//! スキャンを作る処理(`get_scan`・`get_state`・`mobile_lidar_scan`)は雑音の乱数を進めるので readonly にしない。
 
 pub mod config;
 pub mod parts;
@@ -99,7 +103,7 @@ fn mobile_sim_set_velocity(
     arguments = { default = { index = 0 } }
 )]
 fn mobile_sim_get_pose(
-    container: &mut ContainerImpl<SimHandle>,
+    container: &ContainerImpl<SimHandle>,
     index: i64,
 ) -> JuizResult<Pose2DStamped> {
     container
@@ -113,10 +117,7 @@ fn mobile_sim_get_pose(
     description = "Odometry of a robot: time, pose, twist and travelled distance"
     arguments = { default = { index = 0 } }
 )]
-fn mobile_sim_get_odometry(
-    container: &mut ContainerImpl<SimHandle>,
-    index: i64,
-) -> JuizResult<Value> {
+fn mobile_sim_get_odometry(container: &ContainerImpl<SimHandle>, index: i64) -> JuizResult<Value> {
     container.sim().odometry(index).map_err(|e| anyhow!(err(e)))
 }
 
@@ -126,7 +127,7 @@ fn mobile_sim_get_odometry(
     arguments = { default = { index = 0 } }
 )]
 fn mobile_sim_get_odom_pose(
-    container: &mut ContainerImpl<SimHandle>,
+    container: &ContainerImpl<SimHandle>,
     index: i64,
 ) -> JuizResult<Pose2DStamped> {
     container
@@ -151,7 +152,7 @@ fn mobile_sim_get_scan(
     container_type = "mobile_sim"
     description = "Map image (black: occupied, white: free, gray: unknown)"
 )]
-fn mobile_sim_get_map(container: &mut ContainerImpl<SimHandle>) -> JuizResult<Capsule> {
+fn mobile_sim_get_map(container: &ContainerImpl<SimHandle>) -> JuizResult<Capsule> {
     Ok(container.sim().map_image().into())
 }
 
@@ -159,7 +160,7 @@ fn mobile_sim_get_map(container: &mut ContainerImpl<SimHandle>) -> JuizResult<Ca
     container_type = "mobile_sim"
     description = "Map metadata: resolution, origin, width and height"
 )]
-fn mobile_sim_get_map_info(container: &mut ContainerImpl<SimHandle>) -> JuizResult<Value> {
+fn mobile_sim_get_map_info(container: &ContainerImpl<SimHandle>) -> JuizResult<Value> {
     Ok(container.sim().map_info())
 }
 
@@ -367,7 +368,7 @@ fn mobile_lidar_scan(container: &mut ContainerImpl<MobileLidar>) -> JuizResult<L
     container_type = "mobile_lidar"
     description = "Mount of this LiDAR: its ContainerPose seen from the robot (juiz_std.geometry.PoseStamped)"
 )]
-fn mobile_lidar_mount(container: &mut ContainerImpl<MobileLidar>) -> JuizResult<Capsule> {
+fn mobile_lidar_mount(container: &ContainerImpl<MobileLidar>) -> JuizResult<Capsule> {
     let base = container.base.clone();
     Ok(container.pose(&base)?.into())
 }
