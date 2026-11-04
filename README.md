@@ -21,8 +21,8 @@
 [Releases](https://github.com/OpenJUIZ/mobile_sim/releases) から `.juizapp` を取ってきて、juiz で動かします。
 
 ```sh
-# juiz を入れる。版はパッケージの juizapp.yaml の juiz(0.2.1 以降。Releases の説明にも書きます)に合わせる
-pip install juiz-cli==0.2.1
+# juiz を入れる。版はパッケージの juizapp.yaml の juiz(0.2.2 以降。Releases の説明にも書きます)に合わせる
+pip install juiz-cli==0.2.2
 
 juiz run mobile_sim-<版>.juizapp
 # ブラウザで http://localhost:8000/ を開く
@@ -78,6 +78,7 @@ odom0 (static_anchor)            ロボット 0 のオドメトリの原点
 - ロボットを増やすときは `odom1`・`robot1`・`lidar1` と Transform を足し、`mobile_robot` の `odom` を `odom1` に、`mobile_lidar` の `base` を `robot1` にします。`sim0` は `robots: []` にして、ロボットより前に書きます。
 - `sim0` の `index` つきの Process(`mobile_sim_get_pose` など)と conf の `robots:` は 0.3 系では残しています(0.4 で消す予定)。
 - 別の System から `odom0` などへ Transform を張れます(juiz 0.2.1 の System をまたぐ Transform)。mapper_gmapping 0.3 は SLAM の推定を `map → slam_odom0 → odom0` として張るので、mobile_sim の中で `juiz container pose lidar0 --reference map` が読め、画面にも `map` の原点と SLAM が推定したロボットの位置(点線、Anchor ごとに色が違う)が出ます。
+- 位置・地図を読むだけの Process(`mobile_sim_get_pose`・`get_odometry`・`get_odom_pose`・`get_map`・`get_map_info`、`mobile_lidar_mount`)は readonly です(juiz 0.2.2)。管理画面と `juiz container-process list --long` に印が出ます。
 
 ## 構成(予定)
 
@@ -96,11 +97,11 @@ cargo build --workspace   # target/debug/libmobile_sim.so などができる
 cargo test --workspace
 ```
 
-Rust 1.88 以降が要ります。juiz_sdk は `=0.2.1` に固定しています(パッケージの中のプラグインは同じ juiz_sdk でそろえるため)。
+Rust 1.88 以降が要ります。juiz_sdk は `=0.2.2` に固定しています(パッケージの中のプラグインは同じ juiz_sdk でそろえるため)。
 
 ### juiz で動かす
 
-`juiz` 0.2.1 を入れます(`pip install juiz-cli==0.2.1` か `cargo install juiz_app --version 0.2.1 --locked`)。
+`juiz` 0.2.2 を入れます(`pip install juiz-cli==0.2.2` か `cargo install juiz_app --version 0.2.2 --locked`)。
 
 ```sh
 scripts/dev_plugin.sh            # プラグインをビルドして app/plugins/<target>/ に置く

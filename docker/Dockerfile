@@ -3,7 +3,7 @@
 #   docker build -f docker/Dockerfile -t mobile_sim .
 #
 # juiz とプラグインを同じ builder でビルドする(juiz の版は Cargo.toml の juiz_sdk と揃える)。
-ARG JUIZ_VERSION=0.2.1
+ARG JUIZ_VERSION=0.2.2
 
 FROM rust:1-bookworm AS build
 ARG JUIZ_VERSION
