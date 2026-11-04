@@ -7,7 +7,7 @@ header h1 { font-size: 1.2rem; margin: 0; }
 .status.error { color: #ff9c9c; }
 main { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem; }
 #view canvas { background: #ccc; border: 1px solid #999; max-width: 100%; cursor: crosshair; touch-action: none; }
-aside { min-width: 220px; display: flex; flex-direction: column; gap: 0.4rem; }
+aside { flex: 0 0 300px; display: flex; flex-direction: column; gap: 0.4rem; }
 aside h2 { font-size: 1rem; margin: 0.6rem 0 0.2rem; }
 #pad { background: #fff; border: 1px solid #999; border-radius: 8px; touch-action: none; cursor: pointer; }
 .hint { font-size: 0.8rem; color: #666; margin: 0.2rem 0; }
