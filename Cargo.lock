@@ -603,9 +603,9 @@ dependencies = [
 
 [[package]]
 name = "juiz_idl"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23f649e858c14bda21cbb9b81d26c953ff2e2257760c1fd7a9738bc8ca2acf61"
+checksum = "dfd859a1b7fc72557c26acfdd24484413cf889f59a2f5c74a17d3ffdcc2b5210"
 dependencies = [
  "base64",
  "clap",
@@ -617,9 +617,9 @@ dependencies = [
 
 [[package]]
 name = "juiz_macro"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b438534fa2b2fbeac81a4d79173672ebfb6be30d027387a73a5523b04adbf2"
+checksum = "e7f326c2eff66b732ef9e356445c55ba06667afdedd2056112854e9d50c05b14"
 dependencies = [
  "anyhow",
  "litrs",
@@ -631,9 +631,9 @@ dependencies = [
 
 [[package]]
 name = "juiz_sdk"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8af45212afa12c8e5fb1c47ab6429fbd91c60ac7b3280ae9b798cf037f89431"
+checksum = "a15116f071876ca587af2a85922cb8957c2899abe1151b96c9e7698b5299bc79"
 dependencies = [
  "anyhow",
  "base64",
@@ -652,9 +652,9 @@ dependencies = [
 
 [[package]]
 name = "juiz_std_types"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef4bc71cf121779cbc48f64c81d0ef12d443ca308cf761c51249f84c81c70308"
+checksum = "f277df1cadd2d4c17f41671646651ba6bde4740d40821d906cf8053f087b6f4e"
 dependencies = [
  "juiz_idl",
  "juiz_sdk",
@@ -662,9 +662,9 @@ dependencies = [
 
 [[package]]
 name = "juiz_types"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4b4b4210b60fde906512e77d50666621621b0cb3e3255641a71cfb725ba3a50"
+checksum = "c2845941df3f18d799520b37b35387b925ffffbd682ed1b46437e7437455e628"
 dependencies = [
  "base64",
  "regex",
@@ -741,7 +741,7 @@ dependencies = [
 
 [[package]]
 name = "mobile_sim"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "juiz_sdk",
  "juiz_std_types",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "mobile_sim_core"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "image 0.25.10",
  "rand",
