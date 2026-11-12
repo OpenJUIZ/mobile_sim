@@ -1,7 +1,7 @@
 # .juizapp のマニフェスト(juiz docs/spec/app-package.md §4)。languages・targets・rust・files は juiz pack が書き足す
 format: 1
 name: mobile_sim
-version: 0.3.3
+version: 0.3.4
 kind: base
 description: "Planar mobile robot simulator with map, collision, LiDAR and a browser view"
 license: MIT OR Apache-2.0
