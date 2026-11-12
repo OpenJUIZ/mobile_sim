@@ -22,7 +22,7 @@
 
 ```sh
 # juiz を入れる。版はパッケージの juizapp.yaml の juiz(0.2.4 以降。Releases の説明にも書きます)に合わせる
-pip install juiz-cli==0.2.4
+pip install juiz-cli==0.2.7
 
 juiz run mobile_sim-<版>.juizapp
 # ブラウザで http://localhost:8000/ を開く
@@ -97,11 +97,11 @@ cargo build --workspace   # target/debug/libmobile_sim.so などができる
 cargo test --workspace
 ```
 
-Rust 1.88 以降が要ります。juiz_sdk は `=0.2.4` に固定しています(パッケージの中のプラグインは同じ juiz_sdk でそろえるため)。
+Rust 1.89 以降が要ります。juiz_sdk は `=0.2.7` に固定しています(パッケージの中のプラグインは同じ juiz_sdk でそろえるため)。
 
 ### juiz で動かす
 
-`juiz` 0.2.4 を入れます(`pip install juiz-cli==0.2.4` か `cargo install juiz_app --version 0.2.4 --locked`)。
+`juiz` 0.2.7 を入れます(`pip install juiz-cli==0.2.7` か `cargo install juiz_app --version 0.2.7 --locked`)。
 
 ```sh
 scripts/dev_plugin.sh            # プラグインをビルドして app/plugins/<target>/ に置く
