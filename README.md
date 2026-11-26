@@ -31,6 +31,7 @@ juiz run mobile_sim-<版>.juizapp
 - Linux(x86_64・arm64)、macOS(Intel・Apple Silicon)、Windows(x86_64)のプラグインが入っています。
 - プラグインは juiz の C ABI で作っているので、pip の `juiz-cli` でも `cargo install juiz_app` で入れた juiz でも動きます(juiz をビルドした rustc の版は問いません)。v0.2.0 までのパッケージは juiz 0.1.0 が要ります。
 - 基礎パッケージ(`kind: base`)なので、別の juiz アプリから `depends: { mobile_sim: "^0.3" }` でつなげます(IPC の名前は `mobile_sim`)。
+- juiz 0.3.7 からは、起動すると `mobile_sim` という名前でこの機械に登録され、`juiz name list` に出ます。ポートが使われていて 8000 以外で起動しても、同じ機械のアプリは登録から見つけます。`--advertise` を付けると LAN にも広告し、別の機械の `juiz run` が `--depend` なしで見つけます(HTTP には認証が無いので、信頼できる網だけで。[ネーミングサービス](https://openjuiz.github.io/ja/guides/naming/))。
 
 ### Docker
 
